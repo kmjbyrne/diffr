@@ -1,0 +1,77 @@
+<div class="diff-file {% if diff.status == 'added' %}diff-inline{% endif %}" data-filename="{{ file_path }}">
+    <div class="diff-file-header">
+        <span class="diff-file-name">{{ file_path }}</span>
+        <span class="diff-file-status status-{{ diff.status }}">{{ diff.status }}</span>
+        <button class="btn btn-xs view-toggle" onclick="toggleDiffView()">Toggle inline/split</button>
+        {% with target_type="file", target_id=file_path, review_id=review.id, counts=reaction_map.get(file_path, {}), emojis=["thumbsup", "thumbsdown", "eyes", "question", "flag", "fire"] %}
+        {% include "partials/reaction_bar.html" %}
+        {% endwith %}
+    </div>
+
+    {% for hunk in diff.hunks %}
+    <div class="diff-hunk">
+        <div class="hunk-header">{{ hunk.header }}</div>
+        <div class="diff-lines">
+            {% for line in hunk.lines %}
+            <div class="diff-line diff-line-{{ line.line_type }}" data-file="{{ file_path }}">
+                <div class="diff-line-pair diff-line-pair-left">
+                    <div class="line-num"
+                         {% if line.left_num %}
+                         hx-get="/api/comments/form?review_id={{ review.id }}&file_path={{ file_path }}&line_number={{ line.left_num }}&side=left"
+                         hx-target="#comment-slot-left-{{ line.left_num }}"
+                         hx-swap="beforeend"
+                         {% endif %}>{{ line.left_num or '' }}</div>
+                    <div class="line-content"><code>{{ line.left_content }}</code></div>
+                </div>
+                <div class="diff-line-pair diff-line-pair-right">
+                    <div class="line-num"
+                         {% if line.right_num %}
+                         hx-get="/api/comments/form?review_id={{ review.id }}&file_path={{ file_path }}&line_number={{ line.right_num }}&side=right"
+                         hx-target="#comment-slot-right-{{ line.right_num }}"
+                         hx-swap="beforeend"
+                         {% endif %}>{{ line.right_num or '' }}</div>
+                    <div class="line-content"><code>{{ line.right_content }}</code></div>
+                </div>
+            </div>
+
+            {% if line.left_num and ('left:' ~ line.left_num) in comment_map %}
+            <div class="comment-row">
+                <div class="comment-thread" id="comment-slot-left-{{ line.left_num }}">
+                    {% for c in comment_map['left:' ~ line.left_num] %}
+                    {% with comment=c %}
+                    {% include "partials/comment.html" %}
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif line.left_num %}
+            <div class="comment-row comment-row-empty" style="display:none">
+                <div class="comment-thread" id="comment-slot-left-{{ line.left_num }}"></div>
+            </div>
+            {% endif %}
+
+            {% if line.right_num and ('right:' ~ line.right_num) in comment_map %}
+            <div class="comment-row">
+                <div class="comment-thread" id="comment-slot-right-{{ line.right_num }}">
+                    {% for c in comment_map['right:' ~ line.right_num] %}
+                    {% with comment=c %}
+                    {% include "partials/comment.html" %}
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif line.right_num %}
+            <div class="comment-row comment-row-empty" style="display:none">
+                <div class="comment-thread" id="comment-slot-right-{{ line.right_num }}"></div>
+            </div>
+            {% endif %}
+
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+highlightDiffCode(document.querySelector('.diff-file'));
+</script>

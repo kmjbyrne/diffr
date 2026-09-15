@@ -1,0 +1,5 @@
+{% for repo in repos %}
+<option value="{{ repo.path }}">
+    {{ repo.name }}{% if repo.worktree_count > 0 %} ({{ repo.worktree_count }} worktrees){% endif %}
+</option>
+{% endfor %}

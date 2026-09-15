@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - reviews{% endblock %}
+
+{% block content %}
+<div class="index-page">
+    <section class="start-review">
+        <h2>Start a review</h2>
+        <form id="start-review-form" class="review-form">
+            <div class="form-row">
+                <label for="repo_select">Repository</label>
+                <div class="repo-select-wrapper">
+                    <input type="text" id="repo_filter" class="repo-filter" placeholder="Filter repos..." autocomplete="off">
+                    <select id="repo_select" name="repo_path">
+                        <option value="">Select a repository...</option>
+                        {% for repo in repos %}
+                        <option value="{{ repo.path }}" {% if repo.path == repo_path %}selected{% endif %}>
+                            {{ repo.name }}{% if repo.worktree_count > 0 %} ({{ repo.worktree_count }} worktrees){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <label for="branch_select">Branch</label>
+                <select id="branch_select" name="branch">
+                    <option value="">Select a branch...</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label for="base_branch">Base branch</label>
+                <input type="text" id="base_branch" name="base_branch" value="{{ base }}" placeholder="main">
+            </div>
+            <button type="submit" class="btn btn-primary">Start review</button>
+        </form>
+    </section>
+
+    <section id="worktree-section">
+        {% if worktrees %}
+        {% include "partials/worktree_list.html" %}
+        {% endif %}
+    </section>
+
+    {% if recent_reviews %}
+    <section class="recent-reviews">
+        <h2>Recent reviews</h2>
+        <ul class="review-list">
+            {% for r in recent_reviews %}
+            <li class="review-item">
+                <a href="/review/{{ r.id }}">
+                    <span class="review-branch">{{ r.branch }}</span>
+                    <span class="review-status status-{{ r.status }}">{{ r.status }}</span>
+                    <span class="review-path">{{ r.repo_path }}</span>
+                    <span class="review-date">{{ r.created_at }}</span>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    <section class="config-section">
+        <details>
+            <summary>Scan paths</summary>
+            <div id="scan-paths-list">
+                <ul class="scan-paths">
+                    {% for p in scan_paths %}
+                    <li>
+                        <code>{{ p }}</code>
+                        <button class="btn btn-xs btn-danger remove-scan-path" data-path="{{ p }}">Remove</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <form id="add-scan-path-form" style="display:flex;gap:8px;margin-top:8px">
+                <input type="text" id="new_scan_path" placeholder="~/projects" style="flex:1">
+                <button type="submit" class="btn btn-sm">Add path</button>
+            </form>
+        </details>
+    </section>
+</div>
+
+<script>
+document.getElementById('repo_filter').addEventListener('input', (e) => {
+    const filter = e.target.value.toLowerCase();
+    const select = document.getElementById('repo_select');
+    for (const opt of select.options) {
+        if (opt.value === '') continue;
+        const matches = opt.textContent.toLowerCase().includes(filter);
+        opt.style.display = matches ? '' : 'none';
+        opt.hidden = !matches;
+    }
+});
+
+document.getElementById('repo_select').addEventListener('change', async (e) => {
+    const repoPath = e.target.value;
+    if (!repoPath) return;
+
+    fetch('/api/remember-selection', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({repo_path: repoPath})
+    });
+
+    const [wtResp, brResp] = await Promise.all([
+        fetch('/api/worktrees?repo_path=' + encodeURIComponent(repoPath)),
+        fetch('/api/branches?repo_path=' + encodeURIComponent(repoPath)),
+    ]);
+
+    document.getElementById('worktree-section').innerHTML = await wtResp.text();
+    document.getElementById('branch_select').innerHTML = await brResp.text();
+});
+
+document.getElementById('start-review-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const repoPath = form.repo_path.value;
+    if (!repoPath) return;
+
+    fetch('/api/remember-selection', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            repo_path: repoPath,
+            branch: form.branch.value,
+            base: form.base_branch.value
+        })
+    });
+
+    const resp = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            repo_path: repoPath,
+            branch: form.branch.value || 'HEAD',
+            base_branch: form.base_branch.value || 'main'
+        })
+    });
+    const data = await resp.json();
+    window.location.href = '/review/' + data.id;
+});
+
+// Auto-load branches if repo is pre-selected
+(async () => {
+    const repoSelect = document.getElementById('repo_select');
+    if (repoSelect.value) {
+        const resp = await fetch('/api/branches?repo_path=' + encodeURIComponent(repoSelect.value));
+        document.getElementById('branch_select').innerHTML = await resp.text();
+    }
+})();
+
+document.getElementById('add-scan-path-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('new_scan_path');
+    const path = input.value.trim();
+    if (!path) return;
+    await fetch('/api/scan-paths', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    window.location.reload();
+});
+
+document.addEventListener('click', async (e) => {
+    if (!e.target.classList.contains('remove-scan-path')) return;
+    const path = e.target.dataset.path;
+    await fetch('/api/scan-paths', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    window.location.reload();
+});
+</script>
+{% endblock %}

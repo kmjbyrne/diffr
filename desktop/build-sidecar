@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SIDECAR_DIR="$SCRIPT_DIR/src-tauri/sidecars"
+
+mkdir -p "$SIDECAR_DIR"
+
+ARCH="$(uname -m)"
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+
+case "$ARCH" in
+    x86_64)  TARGET_TRIPLE="${ARCH}-apple-darwin" ;;
+    arm64)   TARGET_TRIPLE="aarch64-apple-darwin" ;;
+    aarch64) TARGET_TRIPLE="aarch64-unknown-linux-gnu" ;;
+    *)       TARGET_TRIPLE="${ARCH}-unknown-${OS}-gnu" ;;
+esac
+
+echo "Building diffr sidecar for $TARGET_TRIPLE..."
+
+cd "$REPO_ROOT"
+uv run pyinstaller \
+    --onefile \
+    --name "diffr-${TARGET_TRIPLE}" \
+    --distpath "$SIDECAR_DIR" \
+    --hidden-import uvicorn.logging \
+    --hidden-import uvicorn.loops.auto \
+    --hidden-import uvicorn.protocols.http.auto \
+    --hidden-import uvicorn.protocols.websockets.auto \
+    --hidden-import uvicorn.lifespan.on \
+    --collect-data app \
+    --add-data "app/templates:app/templates" \
+    --add-data "app/static:app/static" \
+    cli.py
+
+echo "Sidecar built: $SIDECAR_DIR/diffr-${TARGET_TRIPLE}"
