@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - {{ review.branch }}{% endblock %}
+
+{% block header_extra %}
+<div class="review-header-info">
+    <span class="review-branch-name">{{ review.branch }}</span>
+    <span class="review-vs">vs</span>
+    <span class="review-base-name">{{ review.base_branch }}</span>
+    <div class="claude-status" id="claude-status" style="display:none">
+        <span class="claude-spinner"></span>
+        <span class="claude-status-text">Claude is thinking...</span>
+    </div>
+    <div class="review-status-controls" id="status-controls">
+        <button class="btn btn-sm status-btn {% if review.status == 'approved' %}active{% endif %}"
+                data-status="approved"
+                hx-patch="/api/reviews/{{ review.id }}"
+                hx-vals='{"status": "approved"}'
+                hx-headers='{"Content-Type": "application/json"}'
+                hx-swap="none"
+                onclick="document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Approve</button>
+        <button class="btn btn-sm status-btn {% if review.status == 'changes_requested' %}active{% endif %}"
+                data-status="changes_requested"
+                hx-patch="/api/reviews/{{ review.id }}"
+                hx-vals='{"status": "changes_requested"}'
+                hx-headers='{"Content-Type": "application/json"}'
+                hx-swap="none"
+                onclick="document.querySelectorAll('.status-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')">Request changes</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="review-layout">
+    <aside class="file-sidebar" id="file-sidebar">
+        <div class="sidebar-tabs">
+            <button class="sidebar-tab active" data-tab="files">Files ({{ files | length }})</button>
+            <button class="sidebar-tab" data-tab="commits">Commits ({{ commits | length }})</button>
+        </div>
+        <div class="sidebar-panel" id="panel-files"
+             hx-get="/api/reviews/{{ review.id }}/files"
+             hx-trigger="commentChanged from:body"
+             hx-swap="innerHTML">
+            {% include "partials/file_list.html" %}
+        </div>
+        <div class="sidebar-panel" id="panel-commits" style="display:none">
+            <ul class="commit-list">
+                {% for c in commits %}
+                <li class="commit-item">
+                    <span class="commit-sha">{{ c.short_sha }}</span>
+                    <span class="commit-subject">{{ c.subject }}</span>
+                    <span class="commit-meta">{{ c.author }} - {{ c.date[:10] }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </aside>
+    <div class="diff-pane" id="diff-pane">
+        <div class="diff-empty">Loading...</div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.sidebar-panel').forEach(p => p.style.display = 'none');
+        tab.classList.add('active');
+        document.getElementById('panel-' + tab.dataset.tab).style.display = '';
+    });
+});
+
+(function restoreState() {
+    const hash = decodeURIComponent(location.hash.slice(1));
+    const reviewId = '{{ review.id }}';
+    let targetFile = hash;
+
+    if (!targetFile) {
+        {% if files %}
+        targetFile = '{{ files[0].path }}';
+        {% endif %}
+    }
+
+    if (!targetFile) return;
+
+    const fileItem = document.querySelector(`.file-item[data-file-path="${CSS.escape(targetFile)}"]`);
+    if (fileItem) {
+        fileItem.classList.add('file-active');
+        htmx.ajax('GET', `/api/reviews/${reviewId}/diff/${targetFile}`, '#diff-pane');
+        location.hash = encodeURIComponent(targetFile);
+    } else {
+        {% if files %}
+        htmx.ajax('GET', `/api/reviews/${reviewId}/diff/{{ files[0].path }}`, '#diff-pane');
+        document.querySelector('.file-item')?.classList.add('file-active');
+        {% endif %}
+    }
+})();
+
+const reviewId = '{{ review.id }}';
+const status = document.getElementById('claude-status');
+const statusText = status.querySelector('.claude-status-text');
+let activeFilePath = decodeURIComponent(location.hash.slice(1)) || '{{ files[0].path if files else "" }}';
+
+const sse = new EventSource(`/api/comments/stream?review_id=${reviewId}`);
+
+sse.onopen = () => console.log('[diffr] SSE connected');
+sse.onerror = (e) => console.log('[diffr] SSE error', e);
+
+sse.addEventListener('claude-reply', (e) => {
+    console.log('[diffr] SSE claude-reply received', e.data);
+    status.classList.add('claude-status-done');
+    statusText.textContent = 'Claude replied';
+    status.style.display = 'flex';
+
+    if (activeFilePath) {
+        const url = `/api/reviews/${reviewId}/diff/${activeFilePath}`;
+        htmx.ajax('GET', url, {target: '#diff-pane', swap: 'innerHTML'});
+    }
+
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+});
+
+document.body.addEventListener('commentChanged', () => {
+    status.style.display = 'flex';
+    status.classList.remove('claude-status-done');
+    statusText.textContent = 'Claude is thinking...';
+});
+</script>
+{% endblock %}

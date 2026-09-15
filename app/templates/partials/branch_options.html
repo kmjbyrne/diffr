@@ -1,0 +1,8 @@
+<option value="">Select a branch...</option>
+{% for b in branches %}
+<option value="{{ b }}"
+    {% if b == current_branch %}selected{% endif %}
+    {% if b in worktree_branches %}class="branch-worktree"{% endif %}>
+    {{ b }}{% if b in worktree_branches %} (worktree){% endif %}{% if b == current_branch %} (current){% endif %}
+</option>
+{% endfor %}

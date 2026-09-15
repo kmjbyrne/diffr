@@ -1,0 +1,30 @@
+{% set emojis = emojis | default(['thumbsup', 'thumbsdown', 'eyes', 'question', 'flag', 'fire']) %}
+{% set counts = counts | default({}) %}
+{% set target_type = target_type | default('line') %}
+{% set target_id = target_id | default('') %}
+{% set review_id = review_id | default(review.id if review else '') %}
+
+{% set emoji_symbols = {
+    'thumbsup': '\U0001F44D',
+    'thumbsdown': '\U0001F44E',
+    'eyes': '\U0001F440',
+    'question': '❓',
+    'flag': '\U0001F6A9',
+    'fire': '\U0001F525'
+} %}
+
+<div class="reaction-bar" id="reactions-{{ target_type }}-{{ target_id }}">
+    {% for emoji in emojis %}
+    <button class="reaction-btn {% if emoji in counts %}active{% endif %}"
+            hx-post="/api/reactions"
+            hx-vals='{"review_id": "{{ review_id }}", "target_type": "{{ target_type }}", "target_id": "{{ target_id }}", "emoji": "{{ emoji }}"}'
+            hx-headers='{"Content-Type": "application/json"}'
+            hx-target="#reactions-{{ target_type }}-{{ target_id }}"
+            hx-swap="outerHTML">
+        <span class="reaction-emoji">{{ emoji_symbols[emoji] }}</span>
+        {% if emoji in counts %}
+        <span class="reaction-count">{{ counts[emoji] }}</span>
+        {% endif %}
+    </button>
+    {% endfor %}
+</div>

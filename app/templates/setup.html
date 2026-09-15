@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - setup{% endblock %}
+
+{% block content %}
+<div class="index-page">
+    <section class="setup-section">
+        <h2>Welcome to diffr</h2>
+        <p class="setup-intro">Add directories to scan for git repositories.</p>
+
+        <form id="add-path-form" class="review-form">
+            <div class="form-row">
+                <label for="scan_path">Repository directory</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="scan_path" name="scan_path"
+                           placeholder="~/projects" autocomplete="off" style="flex: 1;">
+                    <button type="submit" class="btn btn-secondary">Add</button>
+                </div>
+                <p class="setup-hint">diffr will discover git repos (and worktrees) inside this directory.</p>
+            </div>
+        </form>
+
+        <ul id="path-list" class="scan-path-list" style="margin: 1rem 0; list-style: none; padding: 0;"></ul>
+
+        <button id="continue-btn" class="btn btn-primary" style="display: none; width: 100%;">
+            Continue
+        </button>
+    </section>
+</div>
+
+<script>
+const paths = [];
+const pathList = document.getElementById('path-list');
+const continueBtn = document.getElementById('continue-btn');
+
+function renderPaths() {
+    pathList.innerHTML = paths.map((p, i) => `
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; margin-bottom: 0.25rem; background: var(--bg-secondary, #1e1e2e); border-radius: 6px;">
+            <code>${p}</code>
+            <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" onclick="removePath(${i})">remove</button>
+        </li>
+    `).join('');
+    continueBtn.style.display = paths.length ? 'block' : 'none';
+}
+
+async function removePath(index) {
+    const path = paths[index];
+    await fetch('/api/scan-paths', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    paths.splice(index, 1);
+    renderPaths();
+}
+
+document.getElementById('add-path-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('scan_path');
+    const path = input.value.trim();
+    if (!path || paths.includes(path)) return;
+
+    const resp = await fetch('/api/scan-paths', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+        paths.push(path);
+        input.value = '';
+        input.focus();
+        renderPaths();
+    }
+});
+
+continueBtn.addEventListener('click', () => {
+    window.location.href = '/';
+});
+</script>
+{% endblock %}

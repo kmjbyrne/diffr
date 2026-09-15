@@ -1,0 +1,28 @@
+{% if worktrees %}
+<div class="worktrees">
+    <h2>Worktrees</h2>
+    <input type="text" class="worktree-filter" placeholder="Filter worktrees..." oninput="filterWorktrees(this.value)">
+    <ul class="worktree-list" id="worktree-list">
+        {% for wt in worktrees %}
+        <li class="worktree-item" data-search="{{ wt.branch }} {{ wt.path }}" data-wt-path="{{ wt.path }}" data-wt-branch="{{ wt.branch }}">
+            <div class="wt-info">
+                <span class="wt-branch">{{ wt.branch }}</span>
+                <span class="wt-path">{{ wt.path | replace(wt.repo_path, '') }}</span>
+            </div>
+            <div class="wt-stats">
+                {% if wt.files_changed > 0 %}
+                <span class="wt-stat wt-files">{{ wt.files_changed }} file{{ 's' if wt.files_changed != 1 }}</span>
+                {% if wt.insertions > 0 %}<span class="wt-stat wt-additions">+{{ wt.insertions }}</span>{% endif %}
+                {% if wt.deletions > 0 %}<span class="wt-stat wt-deletions">-{{ wt.deletions }}</span>{% endif %}
+                {% else %}
+                <span class="wt-stat wt-empty">no changes</span>
+                {% endif %}
+            </div>
+            <button class="btn btn-sm wt-review-btn">Review</button>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% else %}
+<p class="no-worktrees">No worktrees found for this repository.</p>
+{% endif %}

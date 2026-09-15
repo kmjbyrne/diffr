@@ -1,0 +1,42 @@
+<div class="comment {% if comment.resolved %}comment-resolved{% endif %} {% if comment.get('author', 'user') == 'claude' %}comment-claude{% endif %}" id="comment-{{ comment.id }}">
+    <div class="comment-header">
+        <span class="comment-author {% if comment.get('author', 'user') == 'claude' %}author-claude{% endif %}">{{ comment.get('author', 'user') }}</span>
+        <span class="comment-meta">{{ comment.side }}:{{ comment.line_number }}</span>
+        <span class="comment-time">{{ comment.created_at }}</span>
+        <div class="comment-actions">
+            <button class="btn btn-xs"
+                    hx-get="/api/comments/form?review_id={{ comment.review_id }}&file_path={{ comment.file_path }}&line_number={{ comment.line_number }}&side={{ comment.side }}"
+                    hx-target="closest .comment-thread"
+                    hx-swap="beforeend"
+                    onclick="this.closest('.comment-thread').querySelectorAll('.comment-form-wrapper').forEach(f=>f.remove())">Reply</button>
+            {% if comment.resolved %}
+            <button class="btn btn-xs"
+                    hx-patch="/api/comments/{{ comment.id }}"
+                    hx-vals='{"resolved": false}'
+                    hx-headers='{"Content-Type": "application/json"}'
+                    hx-target="#comment-{{ comment.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="htmx.trigger(document.body, 'commentChanged')">Reopen</button>
+            {% else %}
+            <button class="btn btn-xs btn-resolve"
+                    hx-patch="/api/comments/{{ comment.id }}"
+                    hx-vals='{"resolved": true}'
+                    hx-headers='{"Content-Type": "application/json"}'
+                    hx-target="#comment-{{ comment.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="htmx.trigger(document.body, 'commentChanged')">Resolve</button>
+            {% endif %}
+            <button class="btn btn-xs btn-danger"
+                    hx-delete="/api/comments/{{ comment.id }}"
+                    hx-target="#comment-{{ comment.id }}"
+                    hx-swap="outerHTML"
+                    hx-on::after-request="htmx.trigger(document.body, 'commentChanged')">Delete</button>
+        </div>
+    </div>
+    <div class="comment-body">{{ comment.body }}</div>
+    <div class="comment-reactions">
+        {% with target_type="comment", target_id=comment.id, review_id=comment.review_id, counts={}, emojis=["thumbsup", "thumbsdown", "eyes", "question", "flag", "fire"] %}
+        {% include "partials/reaction_bar.html" %}
+        {% endwith %}
+    </div>
+</div>

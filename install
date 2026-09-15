@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DIFFR_REPO="${DIFFR_REPO:-https://github.com/keithbyrne/diffr.git}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.diffr}"
+
+if ! command -v uv &>/dev/null; then
+    echo "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+if [ -d "$INSTALL_DIR" ]; then
+    echo "Updating diffr..."
+    git -C "$INSTALL_DIR" pull --ff-only
+else
+    echo "Cloning diffr..."
+    git clone "$DIFFR_REPO" "$INSTALL_DIR"
+fi
+
+echo "Installing diffr..."
+uv tool install --force "$INSTALL_DIR"
+
+echo "Done. Run 'diffr' from any repo to start a review."

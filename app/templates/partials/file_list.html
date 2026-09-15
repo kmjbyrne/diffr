@@ -1,0 +1,20 @@
+<ul class="file-list">
+    {% for f in files %}
+    <li class="file-item file-{{ f.status }}"
+        hx-get="/api/reviews/{{ review.id }}/diff/{{ f.path }}"
+        hx-target="#diff-pane"
+        hx-swap="innerHTML"
+        data-file-path="{{ f.path }}"
+        onclick="document.querySelectorAll('.file-item').forEach(i=>i.classList.remove('file-active'));this.classList.add('file-active');location.hash=encodeURIComponent(this.dataset.filePath);if(typeof activeFilePath!=='undefined')activeFilePath=this.dataset.filePath">
+        <span class="file-status-icon">
+            {% if f.status == 'added' %}A{% elif f.status == 'removed' %}D{% elif f.status == 'renamed' %}R{% else %}M{% endif %}
+        </span>
+        <span class="file-name">{{ f.path }}</span>
+        {% if f.path in comment_counts %}
+        <span class="file-comment-badge {% if comment_counts[f.path].unresolved > 0 %}unresolved{% else %}resolved{% endif %}">
+            {{ comment_counts[f.path].unresolved }}/{{ comment_counts[f.path].total }}
+        </span>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
