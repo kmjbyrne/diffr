@@ -14,3 +14,13 @@ class NoOpAI(AIPort):
         body,
     ):
         pass
+
+    def review_code(
+        self,
+        review_id,
+        repo_path,
+        branch,
+        base_branch,
+        files,
+    ):
+        pass

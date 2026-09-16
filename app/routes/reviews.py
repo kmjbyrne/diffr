@@ -13,6 +13,24 @@ from core.models import Review
 router = APIRouter(prefix="/api/reviews")
 
 
+@router.post("/{review_id}/request-review")
+async def request_ai_review(review_id: str):
+    review = deps.reviews.get(review_id)
+    if not review:
+        return {"error": "not found"}
+
+    files = get_diff_files(review.repo_path, review.base_branch, review.branch)
+    ai = deps.get_ai()
+    ai.review_code(
+        review_id=review.id,
+        repo_path=review.repo_path,
+        branch=review.branch,
+        base_branch=review.base_branch,
+        files=files,
+    )
+    return {"ok": True}
+
+
 @router.get("")
 async def search_reviews(
     repo_path: str | None = None, branch: str | None = None, limit: int = 10

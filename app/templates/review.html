@@ -12,6 +12,8 @@
         <span class="claude-status-text">Claude is thinking...</span>
     </div>
     <div class="review-status-controls" id="status-controls">
+        <button class="btn btn-sm btn-review-request" id="request-review-btn"
+                onclick="requestAIReview()">Request review</button>
         <button class="btn btn-sm status-btn {% if review.status == 'approved' %}active{% endif %}"
                 data-status="approved"
                 hx-patch="/api/reviews/{{ review.id }}"
@@ -125,5 +127,17 @@ document.body.addEventListener('commentChanged', () => {
     status.classList.remove('claude-status-done');
     statusText.textContent = 'Claude is thinking...';
 });
+
+async function requestAIReview() {
+    const btn = document.getElementById('request-review-btn');
+    btn.disabled = true;
+    btn.textContent = 'Reviewing...';
+
+    status.style.display = 'flex';
+    status.classList.remove('claude-status-done');
+    statusText.textContent = 'Claude is reviewing...';
+
+    await fetch(`/api/reviews/${reviewId}/request-review`, {method: 'POST'});
+}
 </script>
 {% endblock %}
