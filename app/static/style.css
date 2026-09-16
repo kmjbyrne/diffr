@@ -128,13 +128,13 @@ a:hover { color: var(--accent-hover); }
     top: 100%;
     left: 0;
     margin-top: 4px;
-    background: var(--bg-secondary);
+    background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     min-width: 200px;
     max-height: 300px;
     overflow-y: auto;
-    z-index: 100;
+    z-index: 1000;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
