@@ -101,3 +101,18 @@ class ClaudeAdapter(AIPort):
             print(f"[diffr] spawned pid={proc.pid}")
         except OSError as e:
             print(f"[diffr] spawn failed: {e}")
+
+    def start_work(self, repo_path, branch, task):
+        claude = shutil.which("claude")
+        if not claude:
+            print("[diffr] claude not found in PATH")
+            return
+
+        prompt = (
+            f"You are working on branch `{branch}`.\n\n"
+            f"Task: {task}\n\n"
+            f"Work through the task, making commits as you go. "
+            f"When done, summarize what you changed."
+        )
+
+        self._spawn(claude, prompt, [], repo_path)

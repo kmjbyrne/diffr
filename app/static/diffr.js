@@ -1,3 +1,17 @@
+function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'light' ? '' : 'light';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('diffr-theme', next || 'dark');
+    const hljsLink = document.getElementById('hljs-theme');
+    if (hljsLink) {
+        hljsLink.href = next === 'light'
+            ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css'
+            : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark-dimmed.min.css';
+    }
+}
+
 function startReviewFromWorktree(path, branch) {
     const baseBranch = document.getElementById('base_branch')?.value || 'main';
     fetch('/api/reviews', {
@@ -93,6 +107,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape') {
             const openForms = document.querySelectorAll('.comment-form-wrapper');
             openForms.forEach(f => f.remove());
+            const filter = document.querySelector('.file-filter');
+            if (filter && document.activeElement === filter) {
+                filter.value = '';
+                filterFiles('');
+                filter.blur();
+            }
         }
     });
 });
@@ -133,8 +153,47 @@ function detectLanguage(filename) {
     return map[ext] || null;
 }
 
-function toggleDiffView() {
-    const pane = document.querySelector('.diff-file');
-    if (!pane) return;
-    pane.classList.toggle('diff-inline');
+function toggleDiffView(btn) {
+    const file = btn ? btn.closest('.diff-file') || btn.closest('.diff-file-card') : null;
+    if (!file) return;
+    const isInline = file.classList.toggle('diff-inline');
+    if (btn) btn.textContent = isInline ? 'Unified' : 'Split';
+}
+
+function toggleComments(btn) {
+    const file = btn.closest('.diff-file') || btn.closest('.diff-file-card');
+    if (!file) return;
+    const hidden = file.classList.toggle('comments-hidden');
+    btn.textContent = hidden ? 'Show comments' : 'Hide comments';
+}
+
+function filterFiles(query) {
+    const lower = query.toLowerCase();
+    document.querySelectorAll('#file-list-items .file-item').forEach(item => {
+        const path = (item.dataset.filePath || '').toLowerCase();
+        item.style.display = path.includes(lower) ? '' : 'none';
+    });
+    document.querySelectorAll('.diff-file-card').forEach(card => {
+        const path = (card.dataset.filepath || '').toLowerCase();
+        card.style.display = path.includes(lower) ? '' : 'none';
+    });
+}
+
+function toggleViewed(checkbox) {
+    const item = checkbox.closest('.file-item');
+    if (checkbox.checked) {
+        item.classList.add('file-viewed');
+    } else {
+        item.classList.remove('file-viewed');
+    }
+    updateProgress();
+}
+
+function updateProgress() {
+    const total = document.querySelectorAll('#file-list-items .file-item').length;
+    const viewed = document.querySelectorAll('#file-list-items .file-viewed').length;
+    const text = document.getElementById('progress-text');
+    const fill = document.getElementById('progress-fill');
+    if (text) text.textContent = `${viewed}/${total} viewed`;
+    if (fill) fill.style.width = total ? `${(viewed / total) * 100}%` : '0%';
 }

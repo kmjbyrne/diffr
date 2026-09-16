@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,6 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from adapters.db import init_db
+from adapters.git_watcher import watch_refs
+from app import deps
 from app.routes import comments, pages, reactions, reviews
 
 APP_DIR = Path(__file__).parent / "app"
@@ -14,7 +17,9 @@ APP_DIR = Path(__file__).parent / "app"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    watcher = asyncio.create_task(watch_refs(deps.events, deps.reviews))
     yield
+    watcher.cancel()
 
 
 def create_app() -> FastAPI:
@@ -31,3 +36,10 @@ def create_app() -> FastAPI:
     app.include_router(reactions.router)
 
     return app
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    app = create_app()
+    uvicorn.run(app, host="127.0.0.1", port=8787)

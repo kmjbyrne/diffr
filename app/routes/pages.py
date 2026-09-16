@@ -4,8 +4,10 @@ from dataclasses import asdict
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from adapters.claude_sessions import get_active_workers, get_jobs, get_recent_sessions
 from adapters.git import (
     discover_repos,
+    discover_repos_stale,
     discover_worktrees,
     get_branches,
     get_commits,
@@ -31,7 +33,10 @@ async def index(request: Request):
     branch = os.environ.get("DIFFR_BRANCH") or config.get("last_branch") or ""
     base = os.environ.get("DIFFR_BASE") or config.get("last_base") or "main"
 
-    repos = discover_repos(config["scan_paths"], config.get("max_depth", 2))
+    repos, needs_refresh = discover_repos_stale(
+        config["scan_paths"], config.get("max_depth", 2)
+    )
+    needs_refresh = needs_refresh or not repos
 
     root = get_repo_root(repo_path)
     worktrees = discover_worktrees(repo_path) if root else []
@@ -49,6 +54,7 @@ async def index(request: Request):
             "recent_reviews": [asdict(r) for r in recent_reviews],
             "repos": repos,
             "scan_paths": config["scan_paths"],
+            "needs_refresh": needs_refresh,
         },
     )
 
@@ -176,3 +182,79 @@ async def review_page(request: Request, review_id: str):
             "comment_counts": comment_counts,
         },
     )
+
+
+@router.get("/settings")
+async def settings_page(request: Request):
+    templates = request.app.state.templates
+    config = load_config()
+    return templates.TemplateResponse(
+        request,
+        "settings.html",
+        {
+            "scan_paths": config.get("scan_paths", []),
+            "max_depth": config.get("max_depth", 2),
+            "claude_enabled": config.get("claude_integration", False),
+            "ai_provider": config.get("ai_provider", "noop"),
+        },
+    )
+
+
+@router.get("/sessions")
+async def sessions_page(request: Request):
+    templates = request.app.state.templates
+    config = load_config()
+
+    if not config.get("claude_integration"):
+        return templates.TemplateResponse(
+            request,
+            "sessions.html",
+            {
+                "active_workers": {},
+                "active_count": 0,
+                "jobs": [],
+                "recent": [],
+                "sessions": [],
+                "enabled": False,
+            },
+        )
+
+    active_workers = get_active_workers()
+    jobs = get_jobs(30)
+    recent = get_recent_sessions(30)
+
+    return templates.TemplateResponse(
+        request,
+        "sessions.html",
+        {
+            "active_workers": active_workers,
+            "active_count": len(active_workers),
+            "jobs": jobs,
+            "recent": recent,
+            "sessions": jobs + recent,
+            "enabled": True,
+        },
+    )
+
+
+@router.patch("/api/settings")
+async def update_settings(request: Request):
+    data = await request.json()
+    config = load_config()
+    for key in ("claude_integration", "ai_provider", "max_depth"):
+        if key in data:
+            config[key] = data[key]
+    save_config(config)
+    return {"ok": True}
+
+
+@router.post("/api/reset")
+async def reset_all():
+    import shutil
+
+    from config import CONFIG_PATH
+
+    data_dir = CONFIG_PATH.parent
+    if data_dir.exists():
+        shutil.rmtree(data_dir)
+    return {"ok": True}

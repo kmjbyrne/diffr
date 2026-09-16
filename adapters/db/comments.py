@@ -14,6 +14,7 @@ def _row_to_comment(row) -> Comment:
         author=row["author"],
         resolved=bool(row["resolved"]),
         processed=bool(row["processed"]),
+        parent_id=row["parent_id"] if "parent_id" in row.keys() else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -23,8 +24,8 @@ class SqliteCommentRepository(CommentRepository):
     def create(self, comment: Comment) -> Comment:
         conn = get_connection()
         conn.execute(
-            "INSERT INTO comments (id, review_id, file_path, line_number, side, body, author, processed) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO comments (id, review_id, file_path, line_number, side, body, author, processed, parent_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 comment.id,
                 comment.review_id,
@@ -34,6 +35,7 @@ class SqliteCommentRepository(CommentRepository):
                 comment.body,
                 comment.author,
                 int(comment.processed),
+                comment.parent_id,
             ),
         )
         conn.commit()

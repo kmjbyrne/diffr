@@ -24,3 +24,6 @@ class NoOpAI(AIPort):
         files,
     ):
         pass
+
+    def start_work(self, repo_path, branch, task):
+        pass

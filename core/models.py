@@ -23,6 +23,7 @@ class Comment:
     author: str = "user"
     resolved: bool = False
     processed: bool = False
+    parent_id: str | None = None
     created_at: str = ""
     updated_at: str = ""
 

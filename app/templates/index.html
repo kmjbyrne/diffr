@@ -4,6 +4,18 @@
 
 {% block content %}
 <div class="index-page">
+    <div class="welcome-banner" id="welcome-banner">
+        <button class="welcome-dismiss" onclick="dismissWelcome()">&times;</button>
+        <h3>Welcome to diffr</h3>
+        <p>A local code review tool with AI-powered feedback. Pick a repo and branch below to start reviewing changes against a base branch. Claude can review your code line-by-line, and you can discuss changes right here without pushing to a remote.</p>
+        <ul>
+            <li>Select a repository and branch to review</li>
+            <li>Click "Request review" to get AI feedback on your changes</li>
+            <li>Add inline comments, react, and resolve threads</li>
+            <li>Mention <code>@claude</code> in a comment to get targeted AI feedback on that line</li>
+        </ul>
+    </div>
+
     <section class="start-review">
         <h2>Start a review</h2>
         <form id="start-review-form" class="review-form">
@@ -149,6 +161,16 @@ document.getElementById('start-review-form').addEventListener('submit', async (e
     }
 })();
 
+{% if needs_refresh %}
+(async () => {
+    const resp = await fetch('/api/repos');
+    const repoSelect = document.getElementById('repo_select');
+    const current = repoSelect.value;
+    repoSelect.innerHTML = '<option value="">Select a repository...</option>' + await resp.text();
+    if (current) repoSelect.value = current;
+})();
+{% endif %}
+
 document.getElementById('add-scan-path-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = document.getElementById('new_scan_path');
@@ -172,5 +194,14 @@ document.addEventListener('click', async (e) => {
     });
     window.location.reload();
 });
+
+function dismissWelcome() {
+    document.getElementById('welcome-banner').style.display = 'none';
+    localStorage.setItem('diffr-welcome-dismissed', '1');
+}
+if (localStorage.getItem('diffr-welcome-dismissed')) {
+    const banner = document.getElementById('welcome-banner');
+    if (banner) banner.style.display = 'none';
+}
 </script>
 {% endblock %}

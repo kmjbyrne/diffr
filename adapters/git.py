@@ -1,9 +1,14 @@
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 from core.models import CommitInfo, DiffHunk, DiffLine, FileDiff
+
+_repo_cache: dict[str, tuple[float, list]] = {}
+_worktree_cache: dict[str, tuple[float, list]] = {}
+_CACHE_TTL = 30
 
 
 @dataclass
@@ -108,6 +113,11 @@ def get_branches(repo_path: str) -> list[str]:
     return [b.strip() for b in output.split("\n") if b.strip()]
 
 
+def create_branch(repo_path: str, branch_name: str, start_point: str = "HEAD") -> str:
+    _run_git(repo_path, "branch", branch_name, start_point)
+    return branch_name
+
+
 def get_commits(repo_path: str, base: str, head: str = "HEAD") -> list[CommitInfo]:
     output = _run_git(
         repo_path,
@@ -135,6 +145,12 @@ def get_commits(repo_path: str, base: str, head: str = "HEAD") -> list[CommitInf
 
 
 def discover_repos(scan_paths: list[str], max_depth: int = 2) -> list[DiscoveredRepo]:
+    cache_key = "|".join(sorted(scan_paths)) + f"|{max_depth}"
+    now = time.monotonic()
+    cached = _repo_cache.get(cache_key)
+    if cached and (now - cached[0]) < _CACHE_TTL:
+        return cached[1]
+
     repos: list[DiscoveredRepo] = []
     seen: set[str] = set()
 
@@ -145,7 +161,17 @@ def discover_repos(scan_paths: list[str], max_depth: int = 2) -> list[Discovered
         _scan_dir(root, repos, seen, max_depth, 0)
 
     repos.sort(key=lambda r: r.name.lower())
+    _repo_cache[cache_key] = (now, repos)
     return repos
+
+
+def discover_repos_stale(scan_paths: list[str], max_depth: int = 2) -> tuple[list[DiscoveredRepo], bool]:
+    cache_key = "|".join(sorted(scan_paths)) + f"|{max_depth}"
+    cached = _repo_cache.get(cache_key)
+    if cached:
+        stale = (time.monotonic() - cached[0]) >= _CACHE_TTL
+        return cached[1], stale
+    return [], True
 
 
 def _scan_dir(
@@ -186,6 +212,11 @@ def _scan_dir(
 
 
 def discover_worktrees(repo_path: str) -> list[Worktree]:
+    now = time.monotonic()
+    cached = _worktree_cache.get(repo_path)
+    if cached and (now - cached[0]) < _CACHE_TTL:
+        return cached[1]
+
     worktrees: list[Worktree] = []
 
     root = get_repo_root(repo_path)
@@ -249,6 +280,7 @@ def discover_worktrees(repo_path: str) -> list[Worktree]:
         except (subprocess.SubprocessError, OSError):
             pass
 
+    _worktree_cache[repo_path] = (time.monotonic(), worktrees)
     return worktrees
 
 
@@ -268,6 +300,23 @@ def get_diff_files(repo_path: str, base: str, head: str = "HEAD") -> list[dict]:
                 "status": status_map.get(status_code, "modified"),
             }
         )
+
+    numstat = _run_git(repo_path, "diff", "--numstat", f"{base}...{head}")
+    stat_map: dict[str, tuple[int, int]] = {}
+    for line in numstat.split("\n"):
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 3:
+            adds = int(parts[0]) if parts[0] != "-" else 0
+            dels = int(parts[1]) if parts[1] != "-" else 0
+            stat_map[parts[2]] = (adds, dels)
+
+    for f in files:
+        adds, dels = stat_map.get(f["path"], (0, 0))
+        f["additions"] = adds
+        f["deletions"] = dels
+
     return files
 
 

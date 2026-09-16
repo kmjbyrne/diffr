@@ -1,14 +1,15 @@
-<div class="comment {% if comment.resolved %}comment-resolved{% endif %} {% if comment.get('author', 'user') == 'claude' %}comment-claude{% endif %}" id="comment-{{ comment.id }}">
+{% set depth = depth | default(0) %}
+{% set max_depth = 3 %}
+<div class="comment {% if comment.resolved %}comment-resolved{% endif %} {% if comment.get('author', 'user') == 'claude' %}comment-claude{% endif %} {% if comment.get('parent_id') %}comment-reply{% endif %}" id="comment-{{ comment.id }}">
     <div class="comment-header">
         <span class="comment-author {% if comment.get('author', 'user') == 'claude' %}author-claude{% endif %}">{{ comment.get('author', 'user') }}</span>
-        <span class="comment-meta">{{ comment.side }}:{{ comment.line_number }}</span>
-        <span class="comment-time">{{ comment.created_at }}</span>
+        <span class="comment-time">{{ comment.created_at[11:16] if comment.created_at|length > 16 else comment.created_at }}</span>
         <div class="comment-actions">
             <button class="btn btn-xs"
-                    hx-get="/api/comments/form?review_id={{ comment.review_id }}&file_path={{ comment.file_path }}&line_number={{ comment.line_number }}&side={{ comment.side }}"
-                    hx-target="closest .comment-thread"
+                    hx-get="/api/comments/form?review_id={{ comment.review_id }}&file_path={{ comment.file_path }}&line_number={{ comment.line_number }}&side={{ comment.side }}&parent_id={{ comment.id }}"
+                    hx-target="#replies-{{ comment.id }}"
                     hx-swap="beforeend"
-                    onclick="this.closest('.comment-thread').querySelectorAll('.comment-form-wrapper').forEach(f=>f.remove())">Reply</button>
+                    onclick="this.closest('.comment').querySelectorAll('.comment-form-wrapper').forEach(f=>f.remove())">Reply</button>
             {% if comment.resolved %}
             <button class="btn btn-xs"
                     hx-patch="/api/comments/{{ comment.id }}"
@@ -34,9 +35,23 @@
         </div>
     </div>
     <div class="comment-body">{{ comment.body }}</div>
-    <div class="comment-reactions">
-        {% with target_type="comment", target_id=comment.id, review_id=comment.review_id, counts={}, emojis=["thumbsup", "thumbsdown", "eyes", "question", "flag", "fire"] %}
-        {% include "partials/reaction_bar.html" %}
+    <div class="comment-reactions-wrap">
+        <button class="reaction-trigger" onclick="this.nextElementSibling.classList.toggle('reactions-visible')"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm3.82 1.636a.75.75 0 0 1 1.038.175l.007.009c.103.118.22.222.35.31.264.178.683.37 1.285.37.602 0 1.02-.192 1.285-.371.13-.088.247-.192.35-.31l.007-.008a.75.75 0 0 1 1.222.87l-.614-.431c.614.43.614.431.613.431v.001l-.001.002-.002.003-.005.007-.014.019a2.066 2.066 0 0 1-.184.213 3.02 3.02 0 0 1-.534.39A3.584 3.584 0 0 1 8 11.5a3.584 3.584 0 0 1-1.81-.63 3.02 3.02 0 0 1-.534-.39 2.066 2.066 0 0 1-.184-.213l-.014-.019-.005-.007-.002-.003v-.002h-.001l.613-.432-.614.43a.75.75 0 0 1 .183-1.044ZM6.5 6.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Zm5 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"></path></svg></button>
+        <div class="comment-reactions">
+            {% with target_type="comment", target_id=comment.id, review_id=comment.review_id, counts={}, emojis=["thumbsup", "thumbsdown", "eyes", "question", "flag", "fire"] %}
+            {% include "partials/reaction_bar.html" %}
+            {% endwith %}
+        </div>
+    </div>
+    <div class="comment-replies {% if depth >= max_depth %}replies-flat{% endif %}" id="replies-{{ comment.id }}">
+        {% if replies %}
+        <button class="replies-toggle" onclick="this.parentElement.classList.toggle('replies-collapsed'); var n=this.parentElement.querySelectorAll(':scope > .comment').length; this.textContent=this.parentElement.classList.contains('replies-collapsed') ? '&#9654; '+n+' repl'+(n===1?'y':'ies') : '&#9660; '+n+' repl'+(n===1?'y':'ies')">&#9660; {{ replies | length }} repl{{ 'y' if replies | length == 1 else 'ies' }}</button>
+        {% set next_depth = [depth + 1, max_depth] | min %}
+        {% for reply in replies %}
+        {% with comment=reply, depth=next_depth, replies=reply.get('_replies', []) %}
+        {% include "partials/comment.html" %}
         {% endwith %}
+        {% endfor %}
+        {% endif %}
     </div>
 </div>

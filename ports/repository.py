@@ -14,12 +14,18 @@ class ReviewRepository(ABC):
     def update_status(self, review_id: str, status: str) -> Review | None: ...
 
     @abstractmethod
+    def update_base(self, review_id: str, base_branch: str) -> Review | None: ...
+
+    @abstractmethod
     def search(
         self, repo_path: str | None = None, branch: str | None = None, limit: int = 10
     ) -> list[Review]: ...
 
     @abstractmethod
     def recent(self, limit: int = 20) -> list[Review]: ...
+
+    @abstractmethod
+    def active(self) -> list[Review]: ...
 
 
 class CommentRepository(ABC):

@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - Claude sessions{% endblock %}
+
+{% block header_extra %}
+<div class="review-header-info">
+    <span class="page-title">Claude sessions</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="sessions-page">
+    <div class="sessions-header">
+        <div class="sessions-summary">
+            <span class="stat-chip">{{ active_count }} active</span>
+            <span class="stat-chip">{{ jobs | length }} jobs</span>
+            <span class="stat-chip">{{ sessions | length }} total</span>
+        </div>
+        <input type="text" class="file-filter" placeholder="Filter sessions..." oninput="filterSessions(this.value)">
+    </div>
+
+    {% if active_workers %}
+    <section class="sessions-section">
+        <h2>Active workers</h2>
+        <div class="session-grid">
+            {% for id, worker in active_workers.items() %}
+            <div class="session-card session-active" data-search="{{ worker.get('cwd', '') }} {{ worker.get('sessionId', '') }}">
+                <div class="session-card-header">
+                    <span class="session-status-dot active"></span>
+                    <span class="session-id">{{ worker.get('sessionId', id)[:8] }}</span>
+                    <span class="session-version">{{ worker.get('cliVersion', '') }}</span>
+                </div>
+                <div class="session-card-body">
+                    <div class="session-cwd" title="{{ worker.get('cwd', '') }}">{{ worker.get('cwd', '').split('/')[-1] or worker.get('cwd', '') }}</div>
+                    <div class="session-meta">
+                        <span>pid {{ worker.get('pid', '?') }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if jobs %}
+    <section class="sessions-section">
+        <h2>Background jobs</h2>
+        <div class="session-grid">
+            {% for job in jobs %}
+            <div class="session-card session-{{ job.state }}" data-search="{{ job.title }} {{ job.cwd }} {{ job.intent }}">
+                <div class="session-card-header">
+                    <span class="session-status-dot {{ job.state }}"></span>
+                    <span class="session-title">{{ job.title or job.session_id[:8] }}</span>
+                    <span class="session-state">{{ job.state }}</span>
+                </div>
+                <div class="session-card-body">
+                    {% if job.intent %}
+                    <div class="session-intent">{{ job.intent[:120] }}{% if job.intent | length > 120 %}...{% endif %}</div>
+                    {% endif %}
+                    {% if job.detail %}
+                    <div class="session-detail">{{ job.detail[:100] }}</div>
+                    {% endif %}
+                    <div class="session-meta">
+                        <span class="session-cwd" title="{{ job.cwd }}">{{ job.cwd.split('/')[-1] if job.cwd else '' }}</span>
+                        {% if job.model %}<span class="session-model">{{ job.model.split('.')[-1] if '.' in job.model else job.model }}</span>{% endif %}
+                        {% if job.tokens %}<span>{{ job.tokens }} tokens</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if recent %}
+    <section class="sessions-section">
+        <h2>Recent sessions</h2>
+        <div class="session-grid">
+            {% for s in recent %}
+            <div class="session-card" data-search="{{ s.title }} {{ s.project_dir }} {{ s.cwd }}">
+                <div class="session-card-header">
+                    <span class="session-status-dot completed"></span>
+                    <span class="session-title">{{ s.title or s.session_id[:8] }}</span>
+                </div>
+                <div class="session-card-body">
+                    <div class="session-cwd" title="{{ s.project_dir }}">{{ s.project_dir.split('/')[-1] if s.project_dir else '' }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+function filterSessions(query) {
+    const lower = query.toLowerCase();
+    document.querySelectorAll('.session-card').forEach(card => {
+        const text = (card.dataset.search || '').toLowerCase();
+        card.style.display = text.includes(lower) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

@@ -2,7 +2,8 @@
     <div class="diff-file-header">
         <span class="diff-file-name">{{ file_path }}</span>
         <span class="diff-file-status status-{{ diff.status }}">{{ diff.status }}</span>
-        <button class="btn btn-xs view-toggle" onclick="toggleDiffView()">Toggle inline/split</button>
+        <button class="btn btn-xs view-toggle" onclick="toggleDiffView(this)">Toggle inline/split</button>
+        <button class="btn btn-xs view-toggle" onclick="toggleComments(this)">Hide comments</button>
         {% with target_type="file", target_id=file_path, review_id=review.id, counts=reaction_map.get(file_path, {}), emojis=["thumbsup", "thumbsdown", "eyes", "question", "flag", "fire"] %}
         {% include "partials/reaction_bar.html" %}
         {% endwith %}
@@ -10,7 +11,7 @@
 
     {% for hunk in diff.hunks %}
     <div class="diff-hunk">
-        <div class="hunk-header">{{ hunk.header }}</div>
+        <div class="hunk-header" onclick="this.parentElement.classList.toggle('hunk-collapsed')">{{ hunk.header }}</div>
         <div class="diff-lines">
             {% for line in hunk.lines %}
             <div class="diff-line diff-line-{{ line.line_type }}" data-file="{{ file_path }}">

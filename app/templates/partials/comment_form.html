@@ -1,15 +1,16 @@
 <div class="comment-form-wrapper">
     <form hx-post="/api/comments"
-          hx-target="closest .comment-thread"
+          hx-target="{% if parent_id %}#replies-{{ parent_id }}{% else %}closest .comment-thread{% endif %}"
           hx-swap="beforeend"
           hx-on::after-request="this.closest('.comment-form-wrapper').remove(); htmx.trigger(document.body, 'commentChanged')">
         <input type="hidden" name="review_id" value="{{ review_id }}">
         <input type="hidden" name="file_path" value="{{ file_path }}">
         <input type="hidden" name="line_number" value="{{ line_number }}">
         <input type="hidden" name="side" value="{{ side }}">
-        <textarea name="body" class="comment-input" placeholder="Add a comment..." rows="3" autofocus></textarea>
+        {% if parent_id %}<input type="hidden" name="parent_id" value="{{ parent_id }}">{% endif %}
+        <textarea name="body" class="comment-input" placeholder="{% if parent_id %}Reply...{% else %}Add a comment... (use @claude for AI feedback){% endif %}" rows="2" autofocus></textarea>
         <div class="comment-form-actions">
-            <button type="submit" class="btn btn-sm btn-primary">Comment</button>
+            <button type="submit" class="btn btn-sm btn-primary">{% if parent_id %}Reply{% else %}Comment{% endif %}</button>
             <button type="button" class="btn btn-sm" onclick="this.closest('.comment-form-wrapper').remove()">Cancel</button>
         </div>
     </form>

@@ -69,3 +69,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE comments ADD COLUMN processed INTEGER NOT NULL DEFAULT 0"
         )
+    if "parent_id" not in cols:
+        conn.execute(
+            "ALTER TABLE comments ADD COLUMN parent_id TEXT DEFAULT NULL"
+        )

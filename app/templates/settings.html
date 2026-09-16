@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - settings{% endblock %}
+
+{% block header_extra %}
+<div class="review-header-info">
+    <span class="page-title">Settings</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="settings-page">
+    <section class="settings-section">
+        <h2>Scan paths</h2>
+        <p class="settings-desc">Directories to scan for git repositories.</p>
+        <ul class="scan-paths" id="scan-paths-list">
+            {% for p in scan_paths %}
+            <li class="scan-path-item">
+                <code>{{ p }}</code>
+                <button class="btn btn-xs btn-danger" onclick="removeScanPath('{{ p }}')">Remove</button>
+            </li>
+            {% endfor %}
+        </ul>
+        <form id="add-scan-path-form" class="settings-inline-form">
+            <input type="text" id="new_scan_path" placeholder="~/projects" class="settings-input">
+            <button type="submit" class="btn btn-sm">Add path</button>
+        </form>
+    </section>
+
+    <section class="settings-section">
+        <h2>Integrations</h2>
+
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>Claude integration</h3>
+                <p class="settings-desc">Parse local Claude sessions to see what agents and sessions are active across your projects.</p>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="claude-integration-toggle"
+                       {% if claude_enabled %}checked{% endif %}
+                       onchange="toggleClaudeIntegration(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>AI code review</h3>
+                <p class="settings-desc">Use Claude to review diffs and leave inline comments.</p>
+            </div>
+            <label class="toggle-switch">
+                <input type="checkbox" id="ai-review-toggle"
+                       {% if ai_provider != 'noop' %}checked{% endif %}
+                       onchange="toggleAIReview(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </section>
+
+    <section class="settings-section">
+        <h2>General</h2>
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>Max scan depth</h3>
+                <p class="settings-desc">How many directory levels deep to search for repos.</p>
+            </div>
+            <input type="number" class="settings-input settings-input-sm" value="{{ max_depth }}" min="1" max="5"
+                   onchange="updateSetting('max_depth', parseInt(this.value))">
+        </div>
+    </section>
+
+    <section class="settings-section settings-danger">
+        <h2>Danger zone</h2>
+        <div class="setting-row">
+            <div class="setting-info">
+                <h3>Reset diffr</h3>
+                <p class="settings-desc">Remove all settings, reviews, and comments. This cannot be undone.</p>
+            </div>
+            <button class="btn btn-sm btn-danger" onclick="resetDiffr()">Reset everything</button>
+        </div>
+    </section>
+</div>
+
+<script>
+document.getElementById('add-scan-path-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('new_scan_path');
+    const path = input.value.trim();
+    if (!path) return;
+    await fetch('/api/scan-paths', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    location.reload();
+});
+
+async function removeScanPath(path) {
+    await fetch('/api/scan-paths', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path})
+    });
+    location.reload();
+}
+
+async function toggleClaudeIntegration(enabled) {
+    await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({claude_integration: enabled})
+    });
+}
+
+async function toggleAIReview(enabled) {
+    await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ai_provider: enabled ? 'claude' : 'noop'})
+    });
+}
+
+async function updateSetting(key, value) {
+    const body = {};
+    body[key] = value;
+    await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+}
+
+async function resetDiffr() {
+    if (!confirm('This will delete all settings, reviews, and comments. Continue?')) return;
+    await fetch('/api/reset', {method: 'POST'});
+    location.href = '/';
+}
+</script>
+{% endblock %}
