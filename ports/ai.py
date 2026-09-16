@@ -16,3 +16,15 @@ class AIPort(ABC):
     ) -> None:
         """Notify the AI about a new comment so it can read context and reply."""
         ...
+
+    @abstractmethod
+    def review_code(
+        self,
+        review_id: str,
+        repo_path: str,
+        branch: str,
+        base_branch: str,
+        files: list[dict],
+    ) -> None:
+        """Trigger a full code review of the diff."""
+        ...

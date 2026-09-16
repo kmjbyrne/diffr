@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "dev.diffr.app",
   "build": {
-    "beforeDevCommand": "",
+    "beforeDevCommand": "uv run diffr --no-open &",
     "devUrl": "http://127.0.0.1:8787",
     "beforeBuildCommand": "",
     "frontendDist": "http://127.0.0.1:8787"
@@ -33,9 +33,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "externalBin": [
-      "sidecars/diffr"
     ]
   }
 }
