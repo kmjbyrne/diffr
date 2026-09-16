@@ -1,13 +1,15 @@
 # diffr
 
-Local code review for git worktrees. Review your changes, comment inline,
-discuss with an AI model, fix, and iterate, all _before_ pushing to a remote.
+Local code review interface for Git branches and worktrees. Review your changes,
+comment inline, discuss with an AI model, fix, and iterate, all _before_ pushing
+to a remote.
 
 ## Motivations
 
 I couldn't find a tool that lets you review local worktree changes the way
-GitHub lets you review a pull request (admittedly didn't look very hard). VSCode
-shows worktree diffs, but there's no commenting, threading or conversation.
+GitHub lets you review a pull request (confession: didn't look very hard
+though). VSCode shows worktree diffs, but there's no commenting, threading or
+conversation.
 
 The alternative is pushing to a remote and opening a PR. But that triggers CI,
 burns compute (not good for mother earth 🌍), and puts half-finished work in
@@ -16,16 +18,18 @@ eventually open is already iterated on. Less noise, less wasted CI, fewer rounds
 of review.
 
 This matters more now that AI writes a lot of code. Reviewing model-generated
-changes before they leave your machine is just good practice. diffr gives you a
-place to do that: read the diff, leave comments, let the model respond, fix what
-needs fixing, then push a better draft.
+changes before they leave your machine is just good practice. **diffr** gives
+you a place to do that: read the diff, leave comments, talk to yourself, let the
+model respond, fix what needs fixing, _then_ push a better draft.
 
 ## How It Works
 
-Start `diffr`, pick a repo and branch, and you get a side-by-side diff view with
-inline commenting. Post a comment and the configured AI model reads the code
-context and replies. You can discuss, ask for fixes, or tell it to commit a
-change. When you're satisfied, push to your remote.
+Start `diffr` (in repo or in any workspace/directory), pick a repo and branch,
+and you get a side-by-side diff view with inline commenting.
+
+Post a comment with `@claude` and the configured AI model reads the code context
+and replies. You can discuss, ask for fixes, or tell it to commit a change. When
+you're satisfied, push to your remote.
 
 You review the model's work, or the model reviews your work. Either way is good
 if it means less naughty code released into the wild.

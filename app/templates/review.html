@@ -2,16 +2,74 @@
 
 {% block title %}diffr - {{ review.branch }}{% endblock %}
 
+{% block nav_stacks %}
+{% if stack %}
+<div class="stack-nav">
+    <button class="stack-nav-toggle" onclick="this.parentElement.classList.toggle('open')">
+        <span class="stack-nav-label">{{ stack.name }}</span>
+        <span class="stack-nav-pos">{{ stack.position }}/{{ stack.total }}</span>
+    </button>
+    <div class="stack-nav-dropdown">
+        {% for b in stack.branches %}
+        <a href="#" class="stack-nav-branch {% if b == stack.current %}active{% endif %}"
+           onclick="goToBranchReview('{{ review.repo_path }}', '{{ b }}', '{% if loop.index0 > 0 %}{{ stack.branches[loop.index0 - 1] }}{% else %}{{ review.base_branch }}{% endif %}'); return false;">
+            <span class="stack-nav-branch-pos">{{ loop.index }}/{{ stack.total }}</span>
+            {{ b }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<a href="/stack" class="nav-link">Stacks</a>
+{% endif %}
+{% endblock %}
+
+{% block nav_freshness %}
+<span class="freshness-indicator" id="freshness-indicator"
+      data-repo-path="{{ review.repo_path }}"
+      data-branch="{{ review.branch }}"
+      data-base="{{ review.base_branch }}">
+</span>
+{% endblock %}
+
 {% block header_extra %}
 <div class="review-header-info">
-    <span class="review-branch-name">{{ review.branch }}</span>
-    <span class="review-vs">vs</span>
-    <span class="review-base-name">{{ review.base_branch }}</span>
+    <div class="review-branch-group">
+        <span class="review-branch-name">{{ review.branch }}</span>
+        <span class="review-vs">&rarr;</span>
+        <div class="base-branch-selector" id="base-branch-selector">
+            <button class="review-base-name" onclick="toggleBaseBranchDropdown()">{{ review.base_branch }}</button>
+            <div class="base-branch-dropdown" id="base-branch-dropdown" style="display:none"
+                 hx-get="/api/reviews/{{ review.id }}/branches"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+            </div>
+        </div>
+    </div>
+    <div class="review-repo-path" id="review-repo-path" title="{{ review.repo_path }}">
+        <span class="repo-path-text">{{ review.repo_path | short_path }}</span>
+        <button class="copy-path-btn" onclick="copyRepoPath()" title="Copy path">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z"/></svg>
+        </button>
+        <button class="copy-path-btn" onclick="openTerminalHere()" title="Open terminal here">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2.75C0 1.784.784 1 1.75 1h12.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0114.25 15H1.75A1.75 1.75 0 010 13.25V2.75zm1.75-.25a.25.25 0 00-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25V2.75a.25.25 0 00-.25-.25H1.75zM7.25 8a.75.75 0 01-.22.53l-2.25 2.25a.75.75 0 11-1.06-1.06L5.44 8 3.72 6.28a.75.75 0 011.06-1.06l2.25 2.25A.75.75 0 017.25 8zm1.5 1.5a.75.75 0 000 1.5h3a.75.75 0 000-1.5h-3z"/></svg>
+        </button>
+    </div>
     <div class="claude-status" id="claude-status" style="display:none">
         <span class="claude-spinner"></span>
         <span class="claude-status-text">Claude is thinking...</span>
     </div>
-    <div class="review-status-controls" id="status-controls">
+    <div class="review-header-actions">
+        <div class="view-mode-toggle" id="view-mode-toggle">
+            <button class="view-mode-btn active" data-mode="split" onclick="setViewMode('split')">Split</button>
+            <button class="view-mode-btn" data-mode="unified" onclick="setViewMode('unified')">Unified</button>
+        </div>
+        {% if branch_up_to_date %}
+        <button class="btn btn-sm branch-status-ok" disabled title="Up to date with {{ review.base_branch }}">Update</button>
+        {% else %}
+        <button class="btn btn-sm" id="review-update-btn"
+                onclick="updateBranch()" title="Rebase onto {{ review.base_branch }}">Update</button>
+        {% endif %}
         <button class="btn btn-sm btn-review-request" id="request-review-btn"
                 onclick="requestAIReview()">Request review</button>
         <button class="btn btn-sm status-btn {% if review.status == 'approved' %}active{% endif %}"
@@ -35,9 +93,33 @@
 {% block content %}
 <div class="review-layout">
     <aside class="file-sidebar" id="file-sidebar">
+        <div class="sidebar-meta">
+            <div class="sidebar-stats">
+                {% set total_add = files | sum(attribute='additions') %}
+                {% set total_del = files | sum(attribute='deletions') %}
+                <span class="stat-chip stat-chip-add">+{{ total_add }}</span>
+                <span class="stat-chip stat-chip-del">-{{ total_del }}</span>
+                <span class="stat-chip stat-chip-files">{{ files | length }} files</span>
+            </div>
+            <div class="sidebar-progress">
+                <div class="progress-info">
+                    <span class="progress-text" id="progress-text">0 of {{ files | length }} viewed</span>
+                    <span class="progress-pct" id="progress-pct">0%</span>
+                </div>
+                <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            </div>
+            {% if previous_review %}
+            <div class="sidebar-prev-review">
+                <a href="/review/{{ previous_review.id }}" class="prev-review-link" title="{{ previous_review.created_at }}">Last review</a>
+            </div>
+            {% endif %}
+        </div>
         <div class="sidebar-tabs">
-            <button class="sidebar-tab active" data-tab="files">Files ({{ files | length }})</button>
-            <button class="sidebar-tab" data-tab="commits">Commits ({{ commits | length }})</button>
+            <button class="sidebar-tab active" data-tab="files">Files</button>
+            <button class="sidebar-tab" data-tab="commits">Commits</button>
+        </div>
+        <div class="sidebar-filter">
+            <input type="text" class="file-filter" placeholder="Filter files..." oninput="filterFiles(this.value)">
         </div>
         <div class="sidebar-panel" id="panel-files"
              hx-get="/api/reviews/{{ review.id }}/files"
@@ -56,13 +138,51 @@
                 {% endfor %}
             </ul>
         </div>
+        <div class="sidebar-shortcuts">
+            <span><kbd>/</kbd> search</span>
+            <span><kbd>j</kbd> <kbd>k</kbd> files</span>
+            <span><kbd>v</kbd> viewed</span>
+            <span><kbd>c</kbd> collapse</span>
+        </div>
     </aside>
     <div class="diff-pane" id="diff-pane">
-        <div class="diff-empty">Loading...</div>
+        {% for f in files %}
+        <section class="diff-file-card" id="file-{{ loop.index }}" data-filepath="{{ f.path }}">
+            <div class="diff-card-header" onclick="toggleFileCollapse(this)">
+                <span class="collapse-chevron">&#9660;</span>
+                <span class="file-status-badge status-{{ f.status }}">
+                    {% if f.status == 'added' %}ADDED{% elif f.status == 'removed' %}DELETED{% elif f.status == 'renamed' %}RENAMED{% else %}MODIFIED{% endif %}
+                </span>
+                <span class="diff-card-path">
+                    <span class="diff-card-dir">{{ '/'.join(f.path.split('/')[:-1]) }}/</span><span class="diff-card-name">{{ f.path.split('/')[-1] }}</span>
+                </span>
+                <span class="diff-card-stats">
+                    {% if f.additions %}<span class="stat-add">+{{ f.additions }}</span>{% endif %}
+                    {% if f.deletions %}<span class="stat-del">-{{ f.deletions }}</span>{% endif %}
+                </span>
+                <button class="btn btn-xs view-toggle" onclick="event.stopPropagation(); toggleDiffView(this)">Split</button>
+                <button class="btn btn-xs view-toggle" onclick="event.stopPropagation(); toggleComments(this)">Hide comments</button>
+                <label class="viewed-label" onclick="event.stopPropagation()">
+                    <input type="checkbox" class="viewed-checkbox" onchange="markFileViewed(this, '{{ f.path }}')"> Viewed
+                </label>
+            </div>
+            <div class="diff-card-body"
+                 hx-get="/api/reviews/{{ review.id }}/diff/{{ f.path }}?embed=1"
+                 hx-trigger="intersect once"
+                 hx-swap="innerHTML">
+                <div class="diff-loading">Loading...</div>
+            </div>
+        </section>
+        {% endfor %}
     </div>
 </div>
 
 <script>
+const reviewId = '{{ review.id }}';
+const status = document.getElementById('claude-status');
+const statusText = status.querySelector('.claude-status-text');
+let currentFileIndex = 0;
+
 document.querySelectorAll('.sidebar-tab').forEach(tab => {
     tab.addEventListener('click', () => {
         document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
@@ -72,72 +192,181 @@ document.querySelectorAll('.sidebar-tab').forEach(tab => {
     });
 });
 
-(function restoreState() {
-    const hash = decodeURIComponent(location.hash.slice(1));
-    const reviewId = '{{ review.id }}';
-    let targetFile = hash;
-
-    if (!targetFile) {
-        {% if files %}
-        targetFile = '{{ files[0].path }}';
-        {% endif %}
-    }
-
-    if (!targetFile) return;
-
-    const fileItem = document.querySelector(`.file-item[data-file-path="${CSS.escape(targetFile)}"]`);
-    if (fileItem) {
-        fileItem.classList.add('file-active');
-        htmx.ajax('GET', `/api/reviews/${reviewId}/diff/${targetFile}`, '#diff-pane');
-        location.hash = encodeURIComponent(targetFile);
-    } else {
-        {% if files %}
-        htmx.ajax('GET', `/api/reviews/${reviewId}/diff/{{ files[0].path }}`, '#diff-pane');
-        document.querySelector('.file-item')?.classList.add('file-active');
-        {% endif %}
-    }
-})();
-
-const reviewId = '{{ review.id }}';
-const status = document.getElementById('claude-status');
-const statusText = status.querySelector('.claude-status-text');
-let activeFilePath = decodeURIComponent(location.hash.slice(1)) || '{{ files[0].path if files else "" }}';
-
 const sse = new EventSource(`/api/comments/stream?review_id=${reviewId}`);
-
 sse.onopen = () => console.log('[diffr] SSE connected');
 sse.onerror = (e) => console.log('[diffr] SSE error', e);
 
 sse.addEventListener('claude-reply', (e) => {
-    console.log('[diffr] SSE claude-reply received', e.data);
     status.classList.add('claude-status-done');
     statusText.textContent = 'Claude replied';
     status.style.display = 'flex';
-
-    if (activeFilePath) {
-        const url = `/api/reviews/${reviewId}/diff/${activeFilePath}`;
-        htmx.ajax('GET', url, {target: '#diff-pane', swap: 'innerHTML'});
-    }
-
+    htmx.ajax('GET', `/api/reviews/${reviewId}/diff-all`, {target: '#diff-pane', swap: 'innerHTML'});
     setTimeout(() => { status.style.display = 'none'; }, 3000);
 });
 
-document.body.addEventListener('commentChanged', () => {
-    status.style.display = 'flex';
-    status.classList.remove('claude-status-done');
-    statusText.textContent = 'Claude is thinking...';
+sse.addEventListener('diff-updated', (e) => {
+    htmx.ajax('GET', `/api/reviews/${reviewId}/files`, {target: '#panel-files', swap: 'innerHTML'});
+    htmx.ajax('GET', `/api/reviews/${reviewId}/diff-all`, {target: '#diff-pane', swap: 'innerHTML'});
 });
 
 async function requestAIReview() {
     const btn = document.getElementById('request-review-btn');
     btn.disabled = true;
     btn.textContent = 'Reviewing...';
-
     status.style.display = 'flex';
     status.classList.remove('claude-status-done');
     statusText.textContent = 'Claude is reviewing...';
-
     await fetch(`/api/reviews/${reviewId}/request-review`, {method: 'POST'});
 }
+
+function toggleBaseBranchDropdown() {
+    const dd = document.getElementById('base-branch-dropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+async function updateBranch() {
+    const btn = document.getElementById('review-update-btn');
+    const repoPath = document.getElementById('review-repo-path').title;
+    const baseBranch = document.querySelector('.review-base-name').textContent.trim();
+    btn.disabled = true;
+    btn.textContent = 'Updating...';
+    try {
+        const res = await fetch('/api/worktrees/rebase', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({worktree_path: repoPath, onto: baseBranch})
+        });
+        const data = await res.json();
+        btn.textContent = data.ok ? 'Updated' : 'Failed';
+        btn.classList.add(data.ok ? 'wt-update-ok' : 'wt-update-fail');
+        if (!data.ok) btn.title = data.message;
+        if (data.ok) setTimeout(() => location.reload(), 1000);
+        else setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Update';
+            btn.classList.remove('wt-update-ok', 'wt-update-fail');
+        }, 3000);
+    } catch {
+        btn.disabled = false;
+        btn.textContent = 'Update';
+    }
+}
+
+async function changeBaseBranch(branch) {
+    document.getElementById('base-branch-dropdown').style.display = 'none';
+    await fetch(`/api/reviews/${reviewId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({base_branch: branch})
+    });
+    location.reload();
+}
+
+async function promptCreateBranch() {
+    document.getElementById('base-branch-dropdown').style.display = 'none';
+    const name = prompt('New branch name:');
+    if (!name || !name.trim()) return;
+    const res = await fetch(`/api/reviews/${reviewId}/create-branch`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name.trim()})
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    await changeBaseBranch(data.branch);
+}
+
+function copyRepoPath() {
+    const text = document.querySelector('.repo-path-text').textContent;
+    navigator.clipboard.writeText(text);
+    const btn = document.querySelector('.copy-path-btn');
+    btn.style.color = 'var(--success)';
+    setTimeout(() => { btn.style.color = ''; }, 1000);
+}
+
+async function openTerminalHere() {
+    const path = document.getElementById('review-repo-path')?.title;
+    if (!path) return;
+    await fetch('/api/open-terminal', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: path})
+    });
+}
+
+function setViewMode(mode) {
+    localStorage.setItem('diffr-view-mode', mode);
+    document.querySelectorAll('.view-mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.view-mode-btn[data-mode="${mode}"]`).classList.add('active');
+    document.querySelectorAll('.diff-file-card').forEach(card => {
+        if (mode === 'unified') {
+            card.classList.add('diff-inline');
+        } else {
+            card.classList.remove('diff-inline');
+        }
+    });
+}
+
+(function() {
+    const saved = localStorage.getItem('diffr-view-mode');
+    if (saved && saved !== 'split') setViewMode(saved);
+})();
+
+function toggleFileCollapse(header) {
+    header.closest('.diff-file-card').classList.toggle('file-collapsed');
+}
+
+function markFileViewed(checkbox, filePath) {
+    const sidebar = document.querySelector(`.file-item[data-file-path="${CSS.escape(filePath)}"]`);
+    if (sidebar) {
+        const check = sidebar.querySelector('.file-viewed-check');
+        if (check) check.checked = checkbox.checked;
+        if (checkbox.checked) sidebar.classList.add('file-viewed');
+        else sidebar.classList.remove('file-viewed');
+    }
+    updateProgress();
+}
+
+function scrollToFile(filePath) {
+    const card = document.querySelector(`.diff-file-card[data-filepath="${CSS.escape(filePath)}"]`);
+    if (card) {
+        card.scrollIntoView({behavior: 'smooth', block: 'start'});
+        card.classList.add('file-highlight');
+        setTimeout(() => card.classList.remove('file-highlight'), 1500);
+    }
+    document.querySelectorAll('.file-item').forEach(i => i.classList.remove('file-active'));
+    const sideItem = document.querySelector(`.file-item[data-file-path="${CSS.escape(filePath)}"]`);
+    if (sideItem) sideItem.classList.add('file-active');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    const cards = [...document.querySelectorAll('.diff-file-card')];
+    if (!cards.length) return;
+
+    if (e.key === 'j') {
+        currentFileIndex = Math.min(currentFileIndex + 1, cards.length - 1);
+        cards[currentFileIndex].scrollIntoView({behavior: 'smooth', block: 'start'});
+    } else if (e.key === 'k') {
+        currentFileIndex = Math.max(currentFileIndex - 1, 0);
+        cards[currentFileIndex].scrollIntoView({behavior: 'smooth', block: 'start'});
+    } else if (e.key === 'v') {
+        const card = cards[currentFileIndex];
+        const check = card?.querySelector('.viewed-checkbox');
+        if (check) { check.checked = !check.checked; check.dispatchEvent(new Event('change')); }
+    } else if (e.key === 'c') {
+        cards[currentFileIndex]?.classList.toggle('file-collapsed');
+    } else if (e.key === '/') {
+        e.preventDefault();
+        const filter = document.querySelector('.file-filter');
+        if (filter) filter.focus();
+    }
+});
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('#base-branch-selector')) {
+        document.getElementById('base-branch-dropdown').style.display = 'none';
+    }
+});
 </script>
 {% endblock %}

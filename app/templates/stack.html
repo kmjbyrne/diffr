@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}diffr - stack{% endblock %}
+
+{% block header_extra %}
+<div class="review-header-info">
+    <span class="page-title">Stacks</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="stack-page">
+    <div class="stack-repo-bar">
+        <label for="stack_repo_select">Repository</label>
+        <select id="stack_repo_select" onchange="location.href='/stack?repo_path=' + encodeURIComponent(this.value)">
+            <option value="">Select a repository...</option>
+            {% for repo in repos %}
+            <option value="{{ repo.path }}" {% if repo.path == repo_path %}selected{% endif %}>
+                {{ repo.name }}{% if repo.worktree_count > 0 %} ({{ repo.worktree_count }} worktrees){% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    {% if repo_path %}
+    <div id="stack-map-container" hx-get="/api/stack?repo_path={{ repo_path | urlencode }}" hx-trigger="load" hx-swap="innerHTML">
+        <div class="stack-loading">
+            <div class="stack-loading-spinner"></div>
+            <span>Detecting stacks...</span>
+        </div>
+    </div>
+    {% else %}
+    <p class="no-worktrees">Select a repository to see its branch map.</p>
+    {% endif %}
+</div>
+{% endblock %}

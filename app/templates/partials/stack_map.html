@@ -1,0 +1,237 @@
+{% macro render_stack_graph(stack, repo_path, default_branch, worktree_branches, reviews) %}
+{% set colors = ['#58a6ff', '#3fb950', '#d29922', '#f778ba', '#a371f7', '#79c0ff'] %}
+{% set n = stack.branches | length %}
+{% set sidecar_color = '#6c7086' %}
+{% set row_h = 56 %}
+{% set sidecar_h = 28 %}
+{% set fork_indent = 80 %}
+{% set lane_len = 300 %}
+{% set sidecar_len = 140 %}
+{% set pad_l = 20 %}
+{% set pad_t = 36 %}
+{% set main_y = pad_t %}
+{% set main_len = pad_l + n * fork_indent + lane_len + 80 %}
+{% set svg_w = main_len + 20 %}
+{% set total_sidecar_rows = namespace(count=0) %}
+{% for branch in stack.branches %}
+{% set sc_list = stack.sidecars.get(branch, []) %}
+{% set total_sidecar_rows.count = total_sidecar_rows.count + sc_list | length %}
+{% endfor %}
+{% set svg_h = pad_t + n * row_h + total_sidecar_rows.count * sidecar_h + 20 %}
+<details class="registered-stack" open data-stack-id="{{ stack.id }}" data-repo-path="{{ repo_path }}">
+    <summary class="registered-stack-header">
+        <h3>{{ stack.name }}</h3>
+        <div class="registered-stack-actions">
+            <button class="btn btn-sm stack-update-all" data-stack-id="{{ stack.id }}" data-repo-path="{{ repo_path }}" onclick="event.preventDefault(); updateStack(this)">Update</button>
+            <button class="btn btn-sm btn-danger" onclick="event.preventDefault(); deleteStack('{{ stack.id }}', '{{ repo_path }}')">Remove</button>
+        </div>
+    </summary>
+    <div class="stack-graph-svg-wrap" style="overflow-x:auto">
+        <svg class="stack-graph-svg" viewBox="0 0 {{ svg_w }} {{ svg_h }}" width="{{ svg_w }}" height="{{ svg_h }}">
+            <style>
+                .sg-name { font-family: inherit; font-size: 12px; font-weight: 500; }
+                .sg-sub { font-family: inherit; font-size: 10px; }
+                .sg-main-label { font-family: inherit; font-size: 11px; }
+                .sg-branch-g { cursor: pointer; }
+                .sg-branch-g:hover .sg-dot { r: 9; }
+            </style>
+
+            <line x1="{{ pad_l }}" y1="{{ main_y }}" x2="{{ main_len }}" y2="{{ main_y }}" stroke="var(--text-muted)" stroke-width="2.5" stroke-linecap="round" />
+            <circle cx="{{ pad_l }}" cy="{{ main_y }}" r="6" fill="var(--text-muted)" />
+            <circle cx="{{ main_len }}" cy="{{ main_y }}" r="6" fill="var(--text-muted)" />
+            <text x="{{ pad_l + 14 }}" y="{{ main_y - 10 }}" class="sg-main-label" fill="currentColor" opacity="0.5">{{ default_branch }}</text>
+
+            {% set main_sidecars = stack.sidecars.get(default_branch, []) %}
+            {% for sc in main_sidecars %}
+            {% set si = loop.index0 %}
+            {% set sc_fork_x = pad_l + 60 + si * 60 %}
+            {% set sc_y = main_y + sidecar_h %}
+            {% set sc_end_x = sc_fork_x + sidecar_len %}
+            <circle cx="{{ sc_fork_x }}" cy="{{ main_y }}" r="3" fill="{{ sidecar_color }}" opacity="0.5" />
+            <line x1="{{ sc_fork_x }}" y1="{{ main_y }}" x2="{{ sc_fork_x }}" y2="{{ sc_y }}"
+                  stroke="{{ sidecar_color }}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.5" />
+            <line x1="{{ sc_fork_x }}" y1="{{ sc_y }}" x2="{{ sc_end_x }}" y2="{{ sc_y }}"
+                  stroke="{{ sidecar_color }}" stroke-width="1.5" stroke-linecap="round" opacity="0.4" />
+            <g class="sg-branch-g" data-branch="{{ sc }}" data-repo-path="{{ repo_path }}" data-base="{{ default_branch }}">
+                <circle cx="{{ sc_fork_x }}" cy="{{ sc_y }}" r="5" fill="{{ sidecar_color }}" class="sg-dot" opacity="0.6" />
+                <circle cx="{{ sc_end_x }}" cy="{{ sc_y }}" r="5" fill="{{ sidecar_color }}" class="sg-dot" opacity="0.6" />
+                <text x="{{ sc_fork_x + 10 }}" y="{{ sc_y - 8 }}" class="sg-sub" fill="currentColor" opacity="0.5">{{ sc }}</text>
+            </g>
+            {% endfor %}
+
+            {% for branch in stack.branches %}
+            {% set i = loop.index0 %}
+            {% set color = colors[i % colors | length] %}
+            {% set parent_y = pad_t + i * row_h %}
+            {% set lane_y = parent_y + row_h %}
+            {% set fork_x = pad_l + (i + 1) * fork_indent %}
+            {% set lane_start = fork_x + 28 %}
+            {% set lane_end = lane_start + lane_len %}
+            {% set merge_x = lane_end + 40 %}
+            {% set is_approved = reviews.get(branch) and reviews[branch].status == 'approved' %}
+
+            <circle cx="{{ fork_x }}" cy="{{ parent_y }}" r="3" fill="{{ color }}" opacity="0.6" />
+
+            <path d="M {{ fork_x }} {{ parent_y }} C {{ fork_x }} {{ parent_y + row_h * 0.65 }}, {{ lane_start - 14 }} {{ lane_y }}, {{ lane_start }} {{ lane_y }}"
+                  stroke="{{ color }}" stroke-width="2.5" fill="none" stroke-linecap="round" />
+
+            <line x1="{{ lane_start }}" y1="{{ lane_y }}" x2="{{ lane_end }}" y2="{{ lane_y }}"
+                  stroke="{{ color }}" stroke-width="2.5" stroke-linecap="round" />
+
+            <line x1="{{ lane_end }}" y1="{{ lane_y }}" x2="{{ merge_x }}" y2="{{ main_y }}"
+                  stroke="{{ color }}" stroke-width="2" stroke-linecap="round"
+                  {% if not is_approved %}stroke-dasharray="2 4" opacity="0.4"{% else %}opacity="0.7"{% endif %} />
+
+            <g class="sg-branch-g stack-branch" data-branch="{{ branch }}" data-repo-path="{{ repo_path }}" data-base="{% if i > 0 %}{{ stack.branches[i - 1] }}{% else %}{{ default_branch }}{% endif %}">
+                <circle cx="{{ lane_start }}" cy="{{ lane_y }}" r="7" fill="{{ color }}" class="sg-dot" />
+                <circle cx="{{ lane_end }}" cy="{{ lane_y }}" r="7" fill="{{ color }}" class="sg-dot" />
+                <text x="{{ lane_start + 16 }}" y="{{ lane_y - 14 }}" class="sg-name" fill="currentColor">{{ branch }}{% if branch in worktree_branches %} &#9670;{% endif %}</text>
+                <text class="sg-sub sg-freshness" data-branch="{{ branch }}" x="{{ lane_end - 8 }}" y="{{ lane_y - 14 }}" text-anchor="end" fill="currentColor" opacity="0" font-size="10"></text>
+                {% if reviews.get(branch) %}
+                <text x="{{ lane_end + 14 }}" y="{{ lane_y + 4 }}" class="sg-sub" fill="currentColor" opacity="0.5">{{ reviews[branch].status.replace('_', ' ') }}</text>
+                <text x="{{ lane_start - 14 }}" y="{{ lane_y + 4 }}" class="sg-sub sg-review-link" fill="var(--accent)" text-anchor="end" opacity="0.6">view review</text>
+                {% else %}
+                <text x="{{ lane_end + 14 }}" y="{{ lane_y + 4 }}" class="sg-sub" fill="currentColor" opacity="0.3">no review</text>
+                <text x="{{ lane_start - 14 }}" y="{{ lane_y + 4 }}" class="sg-sub sg-review-link" fill="var(--accent)" text-anchor="end" opacity="0.5">create review</text>
+                {% endif %}
+            </g>
+
+            {% set sc_list = stack.sidecars.get(branch, []) %}
+            {% for sc in sc_list %}
+            {% set si = loop.index0 %}
+            {% set sc_fork_x = lane_start + lane_len * 0.4 + si * 60 %}
+            {% set sc_y = lane_y - sidecar_h %}
+            {% set sc_end_x = sc_fork_x + sidecar_len %}
+            <circle cx="{{ sc_fork_x }}" cy="{{ lane_y }}" r="3" fill="{{ sidecar_color }}" opacity="0.5" />
+            <line x1="{{ sc_fork_x }}" y1="{{ lane_y }}" x2="{{ sc_fork_x }}" y2="{{ sc_y }}"
+                  stroke="{{ sidecar_color }}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.5" />
+            <line x1="{{ sc_fork_x }}" y1="{{ sc_y }}" x2="{{ sc_end_x }}" y2="{{ sc_y }}"
+                  stroke="{{ sidecar_color }}" stroke-width="1.5" stroke-linecap="round" opacity="0.4" />
+            <g class="sg-branch-g" data-branch="{{ sc }}" data-repo-path="{{ repo_path }}" data-base="{{ branch }}">
+                <circle cx="{{ sc_fork_x }}" cy="{{ sc_y }}" r="5" fill="{{ sidecar_color }}" class="sg-dot" opacity="0.6" />
+                <circle cx="{{ sc_end_x }}" cy="{{ sc_y }}" r="5" fill="{{ sidecar_color }}" class="sg-dot" opacity="0.6" />
+                <text x="{{ sc_fork_x + 10 }}" y="{{ sc_y - 8 }}" class="sg-sub" fill="currentColor" opacity="0.5">{{ sc }}</text>
+            </g>
+            {% endfor %}
+
+            {% endfor %}
+        </svg>
+    </div>
+    <details class="stack-sidecars-section">
+        <summary class="sg-sub-header">Sidecars</summary>
+        {% for sc in stack.sidecars.get(default_branch, []) %}
+        <div class="sidecar-item">
+            <span class="sidecar-label">{{ sc }} <span class="sidecar-parent-hint">on {{ default_branch }}</span></span>
+            <button class="btn btn-sm btn-danger" onclick="removeSidecar('{{ stack.id }}', '{{ sc }}', '{{ repo_path }}')">x</button>
+        </div>
+        {% endfor %}
+        {% for branch in stack.branches %}
+        {% set sc_list = stack.sidecars.get(branch, []) %}
+        {% for sc in sc_list %}
+        <div class="sidecar-item">
+            <span class="sidecar-label">{{ sc }} <span class="sidecar-parent-hint">on {{ branch }}</span></span>
+            <button class="btn btn-sm btn-danger" onclick="removeSidecar('{{ stack.id }}', '{{ sc }}', '{{ repo_path }}')">x</button>
+        </div>
+        {% endfor %}
+        {% endfor %}
+        <form class="sidecar-add-form" onsubmit="addSidecar(event, '{{ stack.id }}', '{{ repo_path }}')">
+            <select name="parent" class="sidecar-select" required>
+                <option value="">parent branch...</option>
+                <option value="{{ default_branch }}">{{ default_branch }}</option>
+                {% for b in stack.branches %}
+                <option value="{{ b }}">{{ b }}</option>
+                {% endfor %}
+            </select>
+            <select name="branch" class="sidecar-select" required>
+                <option value="">sidecar branch...</option>
+                {% for b in all_branches %}
+                {% if b != default_branch and b not in stack.branches %}
+                <option value="{{ b }}">{{ b }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-sm">Add</button>
+        </form>
+    </details>
+</details>
+{% endmacro %}
+
+<div class="stack-map">
+    {% if stacks %}
+    {% for stack in stacks %}
+    {{ render_stack_graph(stack, repo_path, default_branch, worktree_branches, reviews) }}
+    {% endfor %}
+    {% endif %}
+
+    {% if suggestions %}
+    <div class="stack-suggestions">
+        <h3>Detected stacks</h3>
+        <p class="stack-suggestions-desc">These branches look like they form a stack. Click to register.</p>
+        {% for chain in suggestions %}
+        <div class="suggestion-item" onclick="registerSuggestion(this, '{{ repo_path }}')">
+            <span class="suggestion-chain">
+                {{ default_branch }}
+                {% for b in chain %} &rarr; {{ b }}{% endfor %}
+            </span>
+            <button class="btn btn-sm">Register</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not stacks and not suggestions %}
+    <p class="no-worktrees">No stacks registered for this repo.</p>
+    {% endif %}
+
+    <div class="stack-create-section" {% if stacks %}style="margin-top: 16px"{% endif %}>
+        <details {% if not stacks %}open{% endif %}>
+            <summary>{% if stacks %}Add another stack{% else %}Create a stack{% endif %}</summary>
+            <form class="stack-create-form" onsubmit="createStackManual(event, '{{ repo_path }}')">
+                <input type="text" name="name" placeholder="Stack name" class="settings-input" required>
+                <select name="branches" multiple class="stack-branch-select" size="8">
+                    {% for b in all_branches %}
+                    {% if b != default_branch and b in worktree_branches %}
+                    <option value="{{ b }}">{{ b }}</option>
+                    {% endif %}
+                    {% endfor %}
+                    {% for b in all_branches %}
+                    {% if b != default_branch and b not in worktree_branches %}
+                    <option value="{{ b }}" class="non-wt-branch">{{ b }}</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <p class="stack-create-hint">Select branches in order from base to tip. Worktree branches listed first.</p>
+                <button type="submit" class="btn btn-sm btn-primary">Create stack</button>
+            </form>
+        </details>
+    </div>
+</div>
+
+{% if stacks %}
+<script>
+(function() {
+    document.querySelectorAll('.registered-stack[data-stack-id]').forEach(el => {
+        const stackId = el.dataset.stackId;
+        const repoPath = el.dataset.repoPath;
+        fetch('/api/stacks/freshness?stack_id=' + encodeURIComponent(stackId) + '&repo_path=' + encodeURIComponent(repoPath))
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) return;
+                Object.entries(data).forEach(([branch, info]) => {
+                    const label = el.querySelector('.sg-freshness[data-branch="' + branch + '"]');
+                    if (!label) return;
+                    if (info.stale) {
+                        label.textContent = info.behind + ' behind';
+                        label.setAttribute('fill', 'var(--warning)');
+                        label.setAttribute('opacity', '0.7');
+                    } else {
+                        label.textContent = 'up to date';
+                        label.setAttribute('fill', 'var(--success)');
+                        label.setAttribute('opacity', '0.4');
+                    }
+                });
+            });
+    });
+})();
+</script>
+{% endif %}

@@ -4,6 +4,7 @@ from adapters.db import (
     SqliteCommentRepository,
     SqliteReactionRepository,
     SqliteReviewRepository,
+    SqliteStackRepository,
 )
 from adapters.sse import SSEEventBus
 from config import load_config
@@ -12,6 +13,7 @@ from ports.ai import AIPort
 reviews = SqliteReviewRepository()
 comments = SqliteCommentRepository()
 reactions = SqliteReactionRepository()
+stacks = SqliteStackRepository()
 events = SSEEventBus()
 
 _AI_PROVIDERS: dict[str, type[AIPort]] = {

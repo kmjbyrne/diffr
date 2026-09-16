@@ -23,6 +23,7 @@ class Comment:
     author: str = "user"
     resolved: bool = False
     processed: bool = False
+    parent_id: str | None = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -71,3 +72,26 @@ class CommitInfo:
     subject: str
     author: str
     date: str
+
+
+@dataclass
+class BranchNode:
+    name: str
+    head_sha: str
+    merge_base: str
+    ahead: int
+    behind: int
+    author: str
+    date: str
+    parent: str = ""
+    children: list["BranchNode"] = field(default_factory=list)
+
+
+@dataclass
+class Stack:
+    id: str
+    name: str
+    repo_path: str
+    branches: list[str] = field(default_factory=list)
+    sidecars: dict[str, list[str]] = field(default_factory=dict)
+    created_at: str = ""

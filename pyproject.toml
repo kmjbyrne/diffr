@@ -2,7 +2,7 @@
 name = "diffr"
 version = "0.1.0"
 description = "Local code review for git worktrees with pluggable AI"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 license = "MIT"
 dependencies = [
     "fastapi>=0.115",
@@ -15,7 +15,7 @@ dependencies = [
 
 [project.scripts]
 diffr = "cli:main"
-diffr-mcp = "mcp_server:main"
+diffr-mcp = "mcp:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -23,6 +23,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app", "core", "ports", "adapters"]
+artifacts = ["app/static/**", "app/templates/**"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"cli.py" = "cli.py"
+"config.py" = "config.py"
+"main.py" = "main.py"
+"mcp.py" = "mcp.py"
+"__main__.py" = "__main__.py"
 
 [tool.uv]
 python-preference = "only-managed"
@@ -30,5 +38,6 @@ python-preference = "only-managed"
 [dependency-groups]
 dev = [
     "mypy>=2.3.1",
+    "pyinstaller>=6.22.3",
     "ruff>=0.16.7",
 ]

@@ -40,6 +40,17 @@ CREATE TABLE IF NOT EXISTS reactions (
 
 CREATE INDEX IF NOT EXISTS idx_comments_review ON comments(review_id, file_path);
 CREATE INDEX IF NOT EXISTS idx_reactions_target ON reactions(target_type, target_id);
+
+CREATE TABLE IF NOT EXISTS stacks (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    repo_path   TEXT NOT NULL,
+    branches    TEXT NOT NULL DEFAULT '[]',
+    sidecars    TEXT NOT NULL DEFAULT '{}',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_stacks_repo ON stacks(repo_path);
 """
 
 
@@ -68,4 +79,13 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "processed" not in cols:
         conn.execute(
             "ALTER TABLE comments ADD COLUMN processed INTEGER NOT NULL DEFAULT 0"
+        )
+    if "parent_id" not in cols:
+        conn.execute(
+            "ALTER TABLE comments ADD COLUMN parent_id TEXT DEFAULT NULL"
+        )
+    stack_cols = {row[1] for row in conn.execute("PRAGMA table_info(stacks)").fetchall()}
+    if stack_cols and "sidecars" not in stack_cols:
+        conn.execute(
+            "ALTER TABLE stacks ADD COLUMN sidecars TEXT NOT NULL DEFAULT '{}'"
         )

@@ -80,6 +80,7 @@ async def create_comment(
     line_number: int = Form(...),
     side: str = Form("right"),
     body: str = Form(...),
+    parent_id: str = Form(None),
 ):
     templates = request.app.state.templates
 
@@ -91,13 +92,14 @@ async def create_comment(
         side=side,
         body=body,
         author="user",
+        parent_id=parent_id or None,
     )
     created = deps.comments.create(comment)
     review = deps.reviews.get(review_id)
 
     append_comment(review_id, file_path, line_number, side, body, "user")
 
-    if review:
+    if review and "@claude" in body.lower():
         ai = deps.get_ai()
         ai.notify(
             review_id=review_id,
@@ -110,11 +112,26 @@ async def create_comment(
             body=body,
         )
 
+    depth = 0
+    if created.parent_id:
+        depth = 1
+        pid = created.parent_id
+        while pid:
+            parent = deps.comments.get(pid)
+            if parent and parent.parent_id:
+                depth += 1
+                pid = parent.parent_id
+            else:
+                break
+    depth = min(depth, 3)
+
     return templates.TemplateResponse(
         request,
         "partials/comment.html",
         {
             "comment": _comment_dict(created),
+            "depth": depth,
+            "replies": [],
         },
     )
 
@@ -139,11 +156,26 @@ async def update_comment(request: Request, comment_id: str):
     if not updated:
         return HTMLResponse("<p>Comment not found</p>")
 
+    depth = 0
+    pid = updated.parent_id
+    while pid:
+        parent = deps.comments.get(pid)
+        if parent and parent.parent_id:
+            depth += 1
+            pid = parent.parent_id
+        else:
+            if parent:
+                depth += 1
+            break
+    depth = min(depth, 3)
+
     return templates.TemplateResponse(
         request,
         "partials/comment.html",
         {
             "comment": _comment_dict(updated),
+            "depth": depth,
+            "replies": [],
         },
     )
 
@@ -161,6 +193,7 @@ async def comment_form(
     file_path: str,
     line_number: int,
     side: str = "right",
+    parent_id: str | None = None,
 ):
     templates = request.app.state.templates
     return templates.TemplateResponse(
@@ -171,6 +204,7 @@ async def comment_form(
             "file_path": file_path,
             "line_number": line_number,
             "side": side,
+            "parent_id": parent_id,
         },
     )
 
@@ -186,6 +220,7 @@ def _comment_dict(c: Comment) -> dict:
         "author": c.author,
         "resolved": int(c.resolved),
         "processed": int(c.processed),
+        "parent_id": c.parent_id,
         "created_at": c.created_at,
         "updated_at": c.updated_at,
     }

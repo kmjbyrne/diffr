@@ -7,6 +7,10 @@
         <li class="worktree-item" data-search="{{ wt.branch }} {{ wt.path }}" data-wt-path="{{ wt.path }}" data-wt-branch="{{ wt.branch }}">
             <div class="wt-info">
                 <span class="wt-branch">{{ wt.branch }}</span>
+                {% if stack_positions is defined and wt.branch in stack_positions %}
+                {% set pos = stack_positions[wt.branch] %}
+                <span class="wt-stacked-badge" title="{{ pos[0] }}">{{ pos[1] }}/{{ pos[2] }}</span>
+                {% endif %}
                 <span class="wt-path">{{ wt.path | replace(wt.repo_path, '') }}</span>
             </div>
             <div class="wt-stats">
@@ -18,7 +22,14 @@
                 <span class="wt-stat wt-empty">no changes</span>
                 {% endif %}
             </div>
-            <button class="btn btn-sm wt-review-btn">Review</button>
+            <div class="wt-actions">
+                {% if wt.path in (wt_up_to_date or []) %}
+                <button class="btn btn-sm wt-update-btn branch-status-ok" disabled title="Up to date">Update</button>
+                {% else %}
+                <button class="btn btn-sm wt-update-btn wt-update-needed" title="Rebase onto default branch">Update</button>
+                {% endif %}
+                <button class="btn btn-sm wt-review-btn">Review</button>
+            </div>
         </li>
         {% endfor %}
     </ul>

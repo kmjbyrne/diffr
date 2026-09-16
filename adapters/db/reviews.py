@@ -50,6 +50,19 @@ class SqliteReviewRepository(ReviewRepository):
         conn.close()
         return _row_to_review(row) if row else None
 
+    def update_base(self, review_id: str, base_branch: str) -> Review | None:
+        conn = get_connection()
+        conn.execute(
+            "UPDATE reviews SET base_branch = ?, updated_at = datetime('now') WHERE id = ?",
+            (base_branch, review_id),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM reviews WHERE id = ?", (review_id,)
+        ).fetchone()
+        conn.close()
+        return _row_to_review(row) if row else None
+
     def search(self, repo_path=None, branch=None, limit=10) -> list[Review]:
         conn = get_connection()
         query = "SELECT * FROM reviews WHERE 1=1"
@@ -70,6 +83,15 @@ class SqliteReviewRepository(ReviewRepository):
         conn = get_connection()
         rows = conn.execute(
             "SELECT * FROM reviews ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        conn.close()
+        return [_row_to_review(r) for r in rows]
+
+    def active(self) -> list[Review]:
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM reviews WHERE status IN ('pending', 'changes_requested') "
+            "ORDER BY created_at DESC"
         ).fetchall()
         conn.close()
         return [_row_to_review(r) for r in rows]

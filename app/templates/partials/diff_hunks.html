@@ -1,0 +1,88 @@
+{% for hunk in diff.hunks %}
+<div class="diff-hunk">
+    <div class="hunk-header" onclick="this.parentElement.classList.toggle('hunk-collapsed')">
+        <span class="hunk-chevron">&#9660;</span>
+        {{ hunk.header }}
+    </div>
+    <div class="diff-lines">
+        {% set safe_fp = file_path | replace('/', '-') | replace('.', '_') %}
+        {% for line in hunk.lines %}
+        <div class="diff-line diff-line-{{ line.line_type }}" data-file="{{ file_path }}">
+            <div class="diff-line-pair diff-line-pair-left">
+                <div class="line-num"
+                     {% if line.left_num %}
+                     hx-get="/api/comments/form?review_id={{ review.id }}&file_path={{ file_path }}&line_number={{ line.left_num }}&side=left"
+                     hx-target="#comment-slot-left-{{ safe_fp }}-{{ line.left_num }}"
+                     hx-swap="beforeend"
+                     {% endif %}>{{ line.left_num or '' }}</div>
+                <div class="line-content"><code>{{ line.left_content }}</code></div>
+            </div>
+            <div class="diff-line-pair diff-line-pair-right">
+                <div class="line-num"
+                     {% if line.right_num %}
+                     hx-get="/api/comments/form?review_id={{ review.id }}&file_path={{ file_path }}&line_number={{ line.right_num }}&side=right"
+                     hx-target="#comment-slot-right-{{ safe_fp }}-{{ line.right_num }}"
+                     hx-swap="beforeend"
+                     {% endif %}>{{ line.right_num or '' }}</div>
+                <div class="line-content"><code>{{ line.right_content }}</code></div>
+            </div>
+        </div>
+
+        {% if line.left_num and ('left:' ~ line.left_num) in comment_map %}
+        {% set left_comments = comment_map['left:' ~ line.left_num] %}
+        <div class="comment-row">
+            <div class="comment-thread" id="comment-slot-left-{{ safe_fp }}-{{ line.left_num }}">
+                <button class="thread-toggle" onclick="this.parentElement.classList.toggle('thread-collapsed')">
+                    <span class="thread-chevron">&#9660;</span>
+                    <span class="thread-count">{{ left_comments | length }} comment{{ 's' if left_comments | length != 1 else '' }}</span>
+                </button>
+                <div class="thread-body">
+                {% for c in left_comments %}
+                {% with comment=c, depth=0, replies=c.get('_replies', []) %}
+                {% include "partials/comment.html" %}
+                {% endwith %}
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% elif line.left_num %}
+        <div class="comment-row comment-row-empty" style="display:none">
+            <div class="comment-thread" id="comment-slot-left-{{ safe_fp }}-{{ line.left_num }}"></div>
+        </div>
+        {% endif %}
+
+        {% if line.right_num and ('right:' ~ line.right_num) in comment_map %}
+        {% set right_comments = comment_map['right:' ~ line.right_num] %}
+        <div class="comment-row">
+            <div class="comment-thread" id="comment-slot-right-{{ safe_fp }}-{{ line.right_num }}">
+                <button class="thread-toggle" onclick="this.parentElement.classList.toggle('thread-collapsed')">
+                    <span class="thread-chevron">&#9660;</span>
+                    <span class="thread-count">{{ right_comments | length }} comment{{ 's' if right_comments | length != 1 else '' }}</span>
+                </button>
+                <div class="thread-body">
+                {% for c in right_comments %}
+                {% with comment=c, depth=0, replies=c.get('_replies', []) %}
+                {% include "partials/comment.html" %}
+                {% endwith %}
+                {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% elif line.right_num %}
+        <div class="comment-row comment-row-empty" style="display:none">
+            <div class="comment-thread" id="comment-slot-right-{{ safe_fp }}-{{ line.right_num }}"></div>
+        </div>
+        {% endif %}
+
+        {% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+<script>
+(function() {
+    var cards = document.querySelectorAll('.diff-file-card');
+    var last = cards[cards.length - 1];
+    if (last) highlightDiffCode(last);
+})();
+</script>

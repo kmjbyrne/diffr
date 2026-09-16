@@ -1,15 +1,17 @@
-<ul class="file-list">
+<ul class="file-list" id="file-list-items">
     {% for f in files %}
     <li class="file-item file-{{ f.status }}"
-        hx-get="/api/reviews/{{ review.id }}/diff/{{ f.path }}"
-        hx-target="#diff-pane"
-        hx-swap="innerHTML"
         data-file-path="{{ f.path }}"
-        onclick="document.querySelectorAll('.file-item').forEach(i=>i.classList.remove('file-active'));this.classList.add('file-active');location.hash=encodeURIComponent(this.dataset.filePath);if(typeof activeFilePath!=='undefined')activeFilePath=this.dataset.filePath">
-        <span class="file-status-icon">
-            {% if f.status == 'added' %}A{% elif f.status == 'removed' %}D{% elif f.status == 'renamed' %}R{% else %}M{% endif %}
+        onclick="document.querySelectorAll('.file-item').forEach(i=>i.classList.remove('file-active'));this.classList.add('file-active');scrollToFile(this.dataset.filePath)">
+        <input type="checkbox" class="file-viewed-check" onclick="event.stopPropagation();toggleViewed(this)" title="Mark as viewed">
+        <span class="file-item-info">
+            <span class="file-name">{{ f.path.split('/')[-1] }}</span>
+            <span class="file-dir">{{ '/'.join(f.path.split('/')[:-1]) or '/' }}</span>
         </span>
-        <span class="file-name">{{ f.path }}</span>
+        <span class="file-stats">
+            {% if f.additions %}<span class="stat-add">+{{ f.additions }}</span>{% endif %}
+            {% if f.deletions %}<span class="stat-del">-{{ f.deletions }}</span>{% endif %}
+        </span>
         {% if f.path in comment_counts %}
         <span class="file-comment-badge {% if comment_counts[f.path].unresolved > 0 %}unresolved{% else %}resolved{% endif %}">
             {{ comment_counts[f.path].unresolved }}/{{ comment_counts[f.path].total }}

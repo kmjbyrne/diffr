@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from core.models import Comment, Reaction, Review
+from core.models import Comment, Reaction, Review, Stack
 
 
 class ReviewRepository(ABC):
@@ -14,12 +14,18 @@ class ReviewRepository(ABC):
     def update_status(self, review_id: str, status: str) -> Review | None: ...
 
     @abstractmethod
+    def update_base(self, review_id: str, base_branch: str) -> Review | None: ...
+
+    @abstractmethod
     def search(
         self, repo_path: str | None = None, branch: str | None = None, limit: int = 10
     ) -> list[Review]: ...
 
     @abstractmethod
     def recent(self, limit: int = 20) -> list[Review]: ...
+
+    @abstractmethod
+    def active(self) -> list[Review]: ...
 
 
 class CommentRepository(ABC):
@@ -75,3 +81,20 @@ class ReactionRepository(ABC):
 
     @abstractmethod
     def for_review(self, review_id: str) -> list[Reaction]: ...
+
+
+class StackRepository(ABC):
+    @abstractmethod
+    def create(self, stack: Stack) -> Stack: ...
+
+    @abstractmethod
+    def get(self, stack_id: str) -> Stack | None: ...
+
+    @abstractmethod
+    def for_repo(self, repo_path: str) -> list[Stack]: ...
+
+    @abstractmethod
+    def update(self, stack_id: str, name: str | None = None, branches: list[str] | None = None, sidecars: dict[str, list[str]] | None = None) -> Stack | None: ...
+
+    @abstractmethod
+    def delete(self, stack_id: str) -> None: ...

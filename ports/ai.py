@@ -25,6 +25,12 @@ class AIPort(ABC):
         branch: str,
         base_branch: str,
         files: list[dict],
-    ) -> None:
-        """Trigger a full code review of the diff."""
-        ...
+    ) -> None: ...
+
+    @abstractmethod
+    def start_work(
+        self,
+        repo_path: str,
+        branch: str,
+        task: str,
+    ) -> None: ...

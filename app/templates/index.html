@@ -4,6 +4,18 @@
 
 {% block content %}
 <div class="index-page">
+    <div class="welcome-banner" id="welcome-banner">
+        <button class="welcome-dismiss" onclick="dismissWelcome()">&times;</button>
+        <h3>Welcome to diffr</h3>
+        <p>A local code review tool with AI-powered feedback. Pick a repo and branch below to start reviewing changes against a base branch. Claude can review your code line-by-line, and you can discuss changes right here without pushing to a remote.</p>
+        <ul>
+            <li>Select a repository and branch to review</li>
+            <li>Click "Request review" to get AI feedback on your changes</li>
+            <li>Add inline comments, react, and resolve threads</li>
+            <li>Mention <code>@claude</code> in a comment to get targeted AI feedback on that line</li>
+        </ul>
+    </div>
+
     <section class="start-review">
         <h2>Start a review</h2>
         <form id="start-review-form" class="review-form">
@@ -35,10 +47,18 @@
         </form>
     </section>
 
-    <section id="worktree-section">
+    <div class="tab-bar" id="wt-stack-tabs">
+        <button class="tab-btn active" data-tab="worktrees" onclick="switchTab(this)">Worktrees</button>
+        <button class="tab-btn" data-tab="stacks" onclick="switchTab(this)">Stacks</button>
+    </div>
+
+    <section id="worktree-section" class="tab-panel active">
         {% if worktrees %}
         {% include "partials/worktree_list.html" %}
         {% endif %}
+    </section>
+
+    <section id="stack-section" class="tab-panel">
     </section>
 
     {% if recent_reviews %}
@@ -50,7 +70,7 @@
                 <a href="/review/{{ r.id }}">
                     <span class="review-branch">{{ r.branch }}</span>
                     <span class="review-status status-{{ r.status }}">{{ r.status }}</span>
-                    <span class="review-path">{{ r.repo_path }}</span>
+                    <span class="review-path">{{ r.repo_path | short_path }}</span>
                     <span class="review-date">{{ r.created_at }}</span>
                 </a>
             </li>
@@ -81,6 +101,14 @@
 </div>
 
 <script>
+function switchTab(btn) {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('#wt-stack-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('worktree-section').classList.toggle('active', tab === 'worktrees');
+    document.getElementById('stack-section').classList.toggle('active', tab === 'stacks');
+}
+
 document.getElementById('repo_filter').addEventListener('input', (e) => {
     const filter = e.target.value.toLowerCase();
     const select = document.getElementById('repo_select');
@@ -102,13 +130,15 @@ document.getElementById('repo_select').addEventListener('change', async (e) => {
         body: JSON.stringify({repo_path: repoPath})
     });
 
-    const [wtResp, brResp] = await Promise.all([
+    const [wtResp, brResp, stackResp] = await Promise.all([
         fetch('/api/worktrees?repo_path=' + encodeURIComponent(repoPath)),
         fetch('/api/branches?repo_path=' + encodeURIComponent(repoPath)),
+        fetch('/api/stack?repo_path=' + encodeURIComponent(repoPath)),
     ]);
 
     document.getElementById('worktree-section').innerHTML = await wtResp.text();
     document.getElementById('branch_select').innerHTML = await brResp.text();
+    document.getElementById('stack-section').innerHTML = '<h2>Stacks</h2>' + await stackResp.text();
 });
 
 document.getElementById('start-review-form').addEventListener('submit', async (e) => {
@@ -144,10 +174,24 @@ document.getElementById('start-review-form').addEventListener('submit', async (e
 (async () => {
     const repoSelect = document.getElementById('repo_select');
     if (repoSelect.value) {
-        const resp = await fetch('/api/branches?repo_path=' + encodeURIComponent(repoSelect.value));
-        document.getElementById('branch_select').innerHTML = await resp.text();
+        const [brResp, stackResp] = await Promise.all([
+            fetch('/api/branches?repo_path=' + encodeURIComponent(repoSelect.value)),
+            fetch('/api/stack?repo_path=' + encodeURIComponent(repoSelect.value)),
+        ]);
+        document.getElementById('branch_select').innerHTML = await brResp.text();
+        document.getElementById('stack-section').innerHTML = '<h2>Stacks</h2>' + await stackResp.text();
     }
 })();
+
+{% if needs_refresh %}
+(async () => {
+    const resp = await fetch('/api/repos');
+    const repoSelect = document.getElementById('repo_select');
+    const current = repoSelect.value;
+    repoSelect.innerHTML = '<option value="">Select a repository...</option>' + await resp.text();
+    if (current) repoSelect.value = current;
+})();
+{% endif %}
 
 document.getElementById('add-scan-path-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -172,5 +216,14 @@ document.addEventListener('click', async (e) => {
     });
     window.location.reload();
 });
+
+function dismissWelcome() {
+    document.getElementById('welcome-banner').style.display = 'none';
+    localStorage.setItem('diffr-welcome-dismissed', '1');
+}
+if (localStorage.getItem('diffr-welcome-dismissed')) {
+    const banner = document.getElementById('welcome-banner');
+    if (banner) banner.style.display = 'none';
+}
 </script>
 {% endblock %}

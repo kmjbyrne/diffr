@@ -1,0 +1,12 @@
+{% for branch in branches %}
+<div class="branch-dropdown-item" onclick="changeBaseBranch('{{ branch }}')">
+    {{ branch }}
+    {% if branch == current_base %}
+    <span class="branch-current-marker">current</span>
+    {% endif %}
+</div>
+{% endfor %}
+<div class="branch-dropdown-divider"></div>
+<div class="branch-dropdown-item branch-dropdown-create" onclick="promptCreateBranch()">
+    + New branch...
+</div>
