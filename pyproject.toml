@@ -15,7 +15,7 @@ dependencies = [
 
 [project.scripts]
 diffr = "cli:main"
-diffr-mcp = "mcp_server:main"
+diffr-mcp = "mcp:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -23,6 +23,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app", "core", "ports", "adapters"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"cli.py" = "cli.py"
+"config.py" = "config.py"
+"main.py" = "main.py"
+"mcp.py" = "mcp.py"
+"__main__.py" = "__main__.py"
 
 [tool.uv]
 python-preference = "only-managed"
