@@ -39,7 +39,26 @@ def create_app() -> FastAPI:
 
 
 if __name__ == "__main__":
+    import threading
+    import time
+    import urllib.request
+    import webbrowser
+
     import uvicorn
 
+    PORT = 8787
+
+    def _open_when_ready():
+        url = f"http://127.0.0.1:{PORT}"
+        for _ in range(30):
+            try:
+                urllib.request.urlopen(url, timeout=1)
+                break
+            except (OSError, urllib.error.URLError):
+                time.sleep(0.2)
+        webbrowser.open(url)
+
+    threading.Thread(target=_open_when_ready, daemon=True).start()
+
     app = create_app()
-    uvicorn.run(app, host="127.0.0.1", port=8787)
+    uvicorn.run(app, host="127.0.0.1", port=PORT)
