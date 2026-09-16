@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
+from importlib.resources import files
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -11,7 +12,7 @@ from adapters.git_watcher import watch_refs
 from app import deps
 from app.routes import comments, pages, reactions, reviews
 
-APP_DIR = Path(__file__).parent / "app"
+APP_DIR = Path(str(files("app")))
 
 
 @asynccontextmanager
