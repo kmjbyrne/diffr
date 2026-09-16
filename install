@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DIFFR_REPO="${DIFFR_REPO:-https://github.com/keithbyrne/diffr.git}"
+DIFFR_REPO="${DIFFR_REPO:-https://github.com/kmjbyrne/diffr.git}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.diffr}"
 
 if ! command -v uv &>/dev/null; then
