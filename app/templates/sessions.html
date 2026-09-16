@@ -47,13 +47,22 @@
         <h2>Background jobs</h2>
         <div class="session-grid">
             {% for job in jobs %}
-            <div class="session-card session-{{ job.state }}" data-search="{{ job.title }} {{ job.cwd }} {{ job.intent }}">
+            <div class="session-card session-{{ job.state }}" data-search="{{ job.title }} {{ job.cwd }} {{ job.intent }} {{ job.worktree_branch }}">
                 <div class="session-card-header">
                     <span class="session-status-dot {{ job.state }}"></span>
                     <span class="session-title">{{ job.title or job.session_id[:8] }}</span>
                     <span class="session-state">{{ job.state }}</span>
                 </div>
                 <div class="session-card-body">
+                    {% if job.worktree_branch %}
+                    <div class="session-worktree">
+                        <span class="worktree-badge">worktree</span>
+                        <span class="worktree-branch">{{ job.worktree_branch }}</span>
+                        {% if job.review_id %}
+                        <a href="/review/{{ job.review_id }}" class="worktree-review-link">View review</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {% if job.intent %}
                     <div class="session-intent">{{ job.intent[:120] }}{% if job.intent | length > 120 %}...{% endif %}</div>
                     {% endif %}

@@ -223,6 +223,13 @@ async def sessions_page(request: Request):
     jobs = get_jobs(30)
     recent = get_recent_sessions(30)
 
+    for job in jobs:
+        if not job.worktree_branch:
+            continue
+        matches = deps.reviews.search(branch=job.worktree_branch, limit=1)
+        if matches:
+            job.review_id = matches[0].id
+
     return templates.TemplateResponse(
         request,
         "sessions.html",

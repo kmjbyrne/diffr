@@ -21,6 +21,9 @@ class ClaudeSession:
     model: str = ""
     tokens: int = 0
     is_job: bool = False
+    worktree_branch: str = ""
+    worktree_path: str = ""
+    review_id: str = ""
 
 
 def _decode_project_path(encoded: str) -> str:
@@ -69,6 +72,8 @@ def get_jobs(limit: int = 30) -> list[ClaudeSession]:
                     model=data.get("providerEnv", {}).get("ANTHROPIC_MODEL", ""),
                     tokens=data.get("tokens", 0),
                     is_job=True,
+                    worktree_branch=data.get("worktreeBranch", ""),
+                    worktree_path=data.get("worktreePath", ""),
                 )
             )
         except (json.JSONDecodeError, OSError):
