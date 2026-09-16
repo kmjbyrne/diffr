@@ -1,22 +1,44 @@
 import os
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from adapters.claude_sessions import get_active_workers, get_jobs, get_recent_sessions
 from adapters.git import (
+    DiscoveredRepo,
     discover_repos,
     discover_repos_stale,
     discover_worktrees,
     get_branches,
     get_commits,
+    get_default_branch,
     get_diff_files,
     get_repo_info,
     get_repo_root,
 )
 from app import deps
 from config import load_config, save_config
+
+
+def _inject_cli_repo(repos: list[DiscoveredRepo]) -> list[DiscoveredRepo]:
+    """Prepend the CLI-provided repo if it isn't already in the list."""
+    cli_path = os.environ.get("DIFFR_REPO_PATH")
+    if not cli_path:
+        return repos
+    root = get_repo_root(cli_path)
+    if not root:
+        return repos
+    if any(r.path == root for r in repos):
+        return repos
+    cli_repo = DiscoveredRepo(
+        path=root,
+        name=Path(root).name,
+        default_branch=get_default_branch(root),
+        worktree_count=len(discover_worktrees(root)),
+    )
+    return [cli_repo] + repos
 
 router = APIRouter()
 
@@ -26,16 +48,19 @@ async def index(request: Request):
     templates = request.app.state.templates
     config = load_config()
 
-    if not config.get("scan_paths"):
+    cli_repo_path = os.environ.get("DIFFR_REPO_PATH")
+
+    if not config.get("scan_paths") and not cli_repo_path:
         return templates.TemplateResponse(request, "setup.html")
 
-    repo_path = os.environ.get("DIFFR_REPO_PATH") or config.get("last_repo") or "."
+    repo_path = cli_repo_path or config.get("last_repo") or "."
     branch = os.environ.get("DIFFR_BRANCH") or config.get("last_branch") or ""
     base = os.environ.get("DIFFR_BASE") or config.get("last_base") or "main"
 
     repos, needs_refresh = discover_repos_stale(
         config["scan_paths"], config.get("max_depth", 2)
     )
+    repos = _inject_cli_repo(repos)
     needs_refresh = needs_refresh or not repos
 
     root = get_repo_root(repo_path)
@@ -101,6 +126,7 @@ async def list_repos(request: Request):
     templates = request.app.state.templates
     config = load_config()
     repos = discover_repos(config["scan_paths"], config.get("max_depth", 2))
+    repos = _inject_cli_repo(repos)
     return templates.TemplateResponse(
         request,
         "partials/repo_options.html",

@@ -96,10 +96,10 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     root = get_repo_root(repo_path)
 
     if root:
-        info = get_repo_info(repo_path)
+        info = get_repo_info(root)
         branch = args.branch or info.current_branch
         base = args.base or info.default_branch
-        os.environ["DIFFR_REPO_PATH"] = repo_path
+        os.environ["DIFFR_REPO_PATH"] = root
         os.environ["DIFFR_BRANCH"] = branch
         os.environ["DIFFR_BASE"] = base
     else:
